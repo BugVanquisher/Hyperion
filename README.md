@@ -1,4 +1,4 @@
-# MultiModel-Serve
+# Hyperion
 **Scalable, Observable, and Reliable inference platform** for **LLMs** (extensible to **LVMs**) on **Kubernetes**.  
 Built with **Python + FastAPI** (Go-ready), featuring **wise capacity allocation** (HPA/KEDA/Karpenter-ready), **caching**, and **deep observability** (Prometheus, Grafana, OpenTelemetry).
 
@@ -45,7 +45,7 @@ flowchart LR
 ├─ docs/                   # Deep dives: scaling, observability, runtime, gateway
 ├─ deploy/docker/          # Dockerfile + docker-compose for local dev
 ├─ deploy/k8s/             # K8s manifests (app, redis, hpa, ingress)
-├─ deploy/helm/multimodel-serve/  # Helm chart skeleton
+├─ deploy/helm/hyperion/  # Helm chart skeleton
 ├─ .github/workflows/      # CI pipeline
 ├─ scripts/                # helper scripts
 └─ README.md               # this file
