@@ -1,0 +1,13 @@
+[project]
+name = "hyperion"
+version = "0.1.0"
+description = "Scalable FastAPI-based inference service for LLMs/LVMs on Kubernetes"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.30.6",
+    "redis==5.0.7",
+    "prometheus-client==0.20.0",
+    "pydantic==2.8.2",
+]
