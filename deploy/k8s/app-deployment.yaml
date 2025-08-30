@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mms-app
+  namespace: mms
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mms-app
+  template:
+    metadata:
+      labels:
+        app: mms-app
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/your-org/hyperion:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: REDIS_URL
+              value: "redis://mms-redis:6379/0"
+            - name: MODEL_NAME
+              value: "stub-llm"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
