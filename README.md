@@ -84,13 +84,13 @@ kubectl apply -f deploy/k8s/hpa-app.yaml
 kubectl apply -f deploy/k8s/ingress.yaml
 ```
 
-> For **Prometheus/Grafana**, prefer Helm: see [docs/observability.md](./docs/observability.md).
+> For **Prometheus/Grafana**, prefer Helm: see [Observability](./docs/observability.md).
 
 ## 📈 Capacity & Scaling
 - **Start** with CPU HPA on gateway, GPU HPA on workers (if used).  
 - **Enable KEDA** for event-driven scaling (queue length, latency PromQL).  
 - **Node autoscaling** with Cluster Autoscaler/**Karpenter**.  
-- **Predictive autoscaling** (Hyperion roadmap): see [docs/scaling.md](./docs/scaling.md).
+- **Predictive autoscaling** (Hyperion roadmap): see [Scaling](./docs/scaling.md).
 
 ## 🧪 API Examples
 ```bash
@@ -121,7 +121,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 🤝 Contributing
-Please see [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+Please see [CONTRIBUTING](./CONTRIBUTING.md) and [CODE_OF_CONDUCT](./CODE_OF_CONDUCT.md).
 
 ## 🪪 License
 MIT © You
