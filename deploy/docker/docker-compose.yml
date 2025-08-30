@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile
+    image: hyperion:local
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MODEL_NAME=stub-llm
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
