@@ -32,8 +32,6 @@ The architecture of Project Hyperion is designed as a layered, distributed syste
 7. The model's prediction is generated and the response flows back through the same path to the client.
 8. Throughout this entire process, a comprehensive Observability Stack (comprising Prometheus, Grafana, ELK Stack, and Jaeger) continuously collects telemetry data—metrics, logs, and traces—from every component. This data provides real-time visibility into system health and performance, feeding into the autoscaling engine and alerting systems.
 
-![High-Level System Blueprint](https://i.imgur.com/2s9Vl7c.png)
-
 ### 1.3. Core Tenets (Guiding Principles)
 
 The design and implementation of Project Hyperion will be governed by a set of foundational principles. These tenets ensure that the platform is not only powerful but also maintainable, scalable, and future-proof.
