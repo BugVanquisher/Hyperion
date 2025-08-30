@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hyperion.fullname" . }}
+  labels:
+    {{- include "hyperion.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "hyperion.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
