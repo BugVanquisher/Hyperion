@@ -18,23 +18,19 @@ flowchart LR
     C[Client] --> I[Ingress/LB]
     I --> A[FastAPI Gateway]
     A -->|cache hit| R[(Redis)]
-    A -->|cache miss| W1[Model Worker(s)]
-
-    subgraph K8sCluster
-        A --- R
-        A --- W1
+    A -->|cache miss| W1[Model Workers]
+    subgraph Kubernetes Cluster
+      A --- R
+      A --- W1
+      classDef k8s fill:#eef,stroke:#99f,stroke-width:1px;
+      class A,R,W1 k8s;
     end
-
     subgraph Observability
-        P[Prometheus] --> G[Grafana]
-        T[Tracing (OTel to Jaeger)]
+      P[Prometheus] --> G[Grafana]
+      T[Tracing - OTel to Jaeger]
     end
-
     A -->|/metrics| P
     A --> T
-
-    classDef k8s fill:#eef,stroke:#99f,stroke-width:1px;
-    class A,R,W1 k8s;
 ```
 - **Gateway:** FastAPI (async, streaming optional).  
 - **Workers:** start with embedded Python workers; can swap in **vLLM**/**Triton**/**KServe** later (see [docs/runtime](./docs/runtime.md)).  
