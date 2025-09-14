@@ -1,3 +1,4 @@
+![License](https://img.shields.io/github/license/BugVanquisher/Hyperion) 
 # Hyperion
 **Scalable, Observable, and Reliable inference platform** for **LLMs** (extensible to **LVMs**) on **Kubernetes**.  
 Built with **Python + FastAPI**, featuring **real model inference**, **Redis caching**, **Prometheus metrics**, and **production-ready deployment**.
