@@ -1,17 +1,54 @@
+version: '3.8'
+
 services:
   app:
     build:
       context: ../../
       dockerfile: deploy/docker/Dockerfile
     image: hyperion:local
+    container_name: hyperion-app
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - MODEL_NAME=stub-llm
+      - MODEL_NAME=microsoft/DialoGPT-small
     ports:
       - "8000:8000"
     depends_on:
       - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    
   redis:
     image: redis:7-alpine
+    container_name: hyperion-redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # Optional: Redis Commander for debugging cache
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: hyperion-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - debug
+
+volumes:
+  redis_data:
