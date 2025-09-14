@@ -228,7 +228,7 @@ hyperion/
 
 ## 📈 Next Steps (Phase 2+)
 
-Choose your next focus area:
+Possible focus:
 
 ### Option A: Scale & Performance
 - **GPU Support**: NVIDIA GPU integration for 10x faster inference
