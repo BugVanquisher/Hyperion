@@ -1,12 +1,20 @@
 # Example implementation with HuggingFace
 import os
 import asyncio
+import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
 MODEL_NAME = os.getenv("MODEL_NAME", "microsoft/DialoGPT-small")
+DEVICE_TYPE = os.getenv("DEVICE_TYPE", "auto")  # auto, cpu, cuda
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1"))
+
 model = None
 tokenizer = None
+device = None
 
 async def init_model():
     global model, tokenizer
