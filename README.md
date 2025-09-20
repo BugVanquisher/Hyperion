@@ -229,21 +229,19 @@ hyperion/
 
 ## 📈 Next Steps (Phase 2+)
 
-Possible focus:
-
-### Option A: Scale & Performance
+### Phase 2: Scale & Performance
 - **GPU Support**: NVIDIA GPU integration for 10x faster inference
 - **Advanced Autoscaling**: HPA + KEDA for event-driven scaling
 - **Request Batching**: Batch multiple requests for higher throughput
 - **Model Optimization**: Quantization and TensorRT acceleration
 
-### Option B: Production Observability  
+### Phase 3: Production Observability  
 - **Grafana Dashboards**: Visual monitoring of all system metrics
 - **Distributed Tracing**: OpenTelemetry + Jaeger for request tracking
 - **Log Aggregation**: ELK stack for centralized debugging
 - **Alerting**: PagerDuty/Slack notifications for SLA violations
 
-### Option C: Model & MLOps
+### Phase 4: Model & MLOps
 - **Model Versioning**: A/B testing and canary deployments
 - **Larger Models**: GPT-2 Large, specialized domain models
 - **Model Registry**: MLflow integration for experiment tracking
