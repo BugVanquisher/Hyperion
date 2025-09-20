@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 MODEL_NAME = os.getenv("MODEL_NAME", "microsoft/DialoGPT-small")
 DEVICE_TYPE = os.getenv("DEVICE_TYPE", "auto")  # auto, cpu, cuda
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "1"))
+ENABLE_QUANTIZATION = os.getenv("ENABLE_QUANTIZATION", "false").lower() == "true"
+ENABLE_OPTIMIZATION = os.getenv("ENABLE_OPTIMIZATION", "true").lower() == "true"
 
 model = None
 tokenizer = None
@@ -46,6 +48,55 @@ def get_optimal_device():
 
     return device
 
+def optimize_model(model, device):
+    """Apply various optimizations to the model."""
+    if not ENABLE_OPTIMIZATION:
+        return model
+
+    logger.info("Applying model optimizations...")
+
+    # Quantization for CPU inference
+    if device.type == "cpu" and ENABLE_QUANTIZATION:
+        try:
+            logger.info("Applying dynamic quantization for CPU...")
+            quantized_model = torch.quantization.quantize_dynamic(
+                model,
+                {torch.nn.Linear},  # Quantize linear layers
+                dtype=torch.qint8
+            )
+            logger.info("Dynamic quantization applied successfully")
+            return quantized_model
+        except Exception as e:
+            logger.warning(f"Quantization failed, using original model: {e}")
+
+    # GPU optimizations
+    if device.type == "cuda":
+        try:
+            # Enable optimized attention (if available)
+            if hasattr(torch.nn.functional, 'scaled_dot_product_attention'):
+                logger.info("Using optimized scaled dot product attention")
+
+            # Compile model for faster inference (PyTorch 2.0+)
+            if hasattr(torch, 'compile'):
+                logger.info("Compiling model with torch.compile...")
+                compiled_model = torch.compile(model, mode="reduce-overhead")
+                logger.info("Model compilation completed")
+                return compiled_model
+
+        except Exception as e:
+            logger.warning(f"GPU optimization failed: {e}")
+
+    # Memory optimization
+    try:
+        # Enable memory efficient attention if available
+        if hasattr(model.config, 'use_memory_efficient_attention'):
+            model.config.use_memory_efficient_attention = True
+            logger.info("Enabled memory efficient attention")
+    except Exception as e:
+        logger.debug(f"Memory optimization not available: {e}")
+
+    return model
+
 async def init_model():
     global model, tokenizer, device
     if model is None:
@@ -66,6 +117,9 @@ async def init_model():
 
         # Move model to device
         model = model.to(device)
+
+        # Apply optimizations
+        model = optimize_model(model, device)
 
         # Enable optimization for inference
         model.eval()
@@ -128,7 +182,12 @@ def get_device_info():
 
     info = {
         "device_type": device.type,
-        "device_name": str(device)
+        "device_name": str(device),
+        "optimizations": {
+            "quantization_enabled": ENABLE_QUANTIZATION,
+            "optimization_enabled": ENABLE_OPTIMIZATION,
+            "batch_size": BATCH_SIZE
+        }
     }
 
     if device.type == "cuda" and torch.cuda.is_available():
@@ -137,7 +196,17 @@ def get_device_info():
             "gpu_memory_total": f"{torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB",
             "gpu_memory_allocated": f"{torch.cuda.memory_allocated() / 1e9:.2f}GB",
             "gpu_memory_reserved": f"{torch.cuda.memory_reserved() / 1e9:.2f}GB",
-            "cuda_version": torch.version.cuda
+            "cuda_version": torch.version.cuda,
+            "torch_compile_available": hasattr(torch, 'compile')
         })
+
+    # Model optimization info
+    if model is not None:
+        info["model_info"] = {
+            "model_name": MODEL_NAME,
+            "model_type": type(model).__name__,
+            "is_quantized": "quantized" in str(type(model)).lower(),
+            "parameters": getattr(model, 'num_parameters', lambda: 0)() if hasattr(model, 'num_parameters') else "unknown"
+        }
 
     return info
