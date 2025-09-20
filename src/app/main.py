@@ -7,7 +7,7 @@ import time
 import logging
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import PlainTextResponse, JSONResponse
-from .models.llm import generate_text, init_model, health_check
+from .models.llm import generate_text, init_model, health_check, get_device_info
 from .cache import get_cache, cache_key
 
 # Set up logging
@@ -68,6 +68,7 @@ class HealthResponse(BaseModel):
     version: str
     model_loaded: bool
     timestamp: str
+    device_info: dict
 
 # Global startup flag
 model_loading_complete = False
@@ -118,12 +119,13 @@ async def prometheus_middleware(request, call_next):
 async def healthz():
     """Health check endpoint with detailed status."""
     model_healthy = await health_check() if model_loading_complete else False
-    
+
     return HealthResponse(
         ok=model_loading_complete and model_healthy,
         version=app.version,
         model_loaded=model_loading_complete,
-        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        device_info=get_device_info()
     )
 
 @app.get("/readiness")
