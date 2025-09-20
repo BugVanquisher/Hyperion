@@ -1,0 +1,91 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: hyperion-app-redis-scaler
+  namespace: hyperion
+spec:
+  scaleTargetRef:
+    name: hyperion-app
+  pollingInterval: 30  # Check every 30 seconds
+  cooldownPeriod: 300  # 5 minute cooldown
+  idleReplicaCount: 1  # Scale to 1 when idle
+  minReplicaCount: 1
+  maxReplicaCount: 15
+  triggers:
+  # Redis queue-based scaling
+  - type: redis
+    metadata:
+      address: hyperion-redis:6379
+      listName: inference_queue
+      listLength: "5"  # Scale when queue > 5 items
+      enableTLS: "false"
+  # Prometheus metrics-based scaling
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: http_requests_per_second
+      threshold: "10"
+      query: rate(http_requests_total{job="hyperion-app"}[1m])
+  # Custom metrics trigger
+  - type: metrics-api
+    metadata:
+      targetValue: "20"  # Target 20 requests per minute
+      metricName: inference_requests_per_minute
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: hyperion-app-gpu-scaler
+  namespace: hyperion
+spec:
+  scaleTargetRef:
+    name: hyperion-app-gpu
+  pollingInterval: 15  # Faster polling for GPU
+  cooldownPeriod: 600  # 10 minute cooldown for expensive GPU pods
+  idleReplicaCount: 0  # Scale to 0 when idle (save costs)
+  minReplicaCount: 0
+  maxReplicaCount: 5   # Limited by GPU nodes
+  triggers:
+  # GPU-specific queue scaling
+  - type: redis
+    metadata:
+      address: hyperion-redis:6379
+      listName: gpu_inference_queue
+      listLength: "2"  # Scale GPU faster
+      enableTLS: "false"
+  # High-load Prometheus trigger
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: high_load_requests
+      threshold: "50"  # Scale GPU when regular pods overwhelmed
+      query: rate(http_requests_total{job="hyperion-app",status_code="503"}[2m])
+  # Model inference latency trigger
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: inference_latency_p99
+      threshold: "2000"  # Scale when p99 latency > 2s
+      query: histogram_quantile(0.99, rate(model_inference_duration_seconds_bucket[5m])) * 1000
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: redis-auth
+  namespace: hyperion
+spec:
+  secretTargetRef:
+  - parameter: password
+    name: redis-secret
+    key: redis-password
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: prometheus-auth
+  namespace: hyperion
+spec:
+  secretTargetRef:
+  - parameter: bearerToken
+    name: prometheus-secret
+    key: bearer-token

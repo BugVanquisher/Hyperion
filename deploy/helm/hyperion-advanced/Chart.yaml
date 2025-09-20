@@ -1,0 +1,29 @@
+apiVersion: v2
+name: hyperion-advanced
+description: Advanced Hyperion ML Inference Platform with GPU support and intelligent autoscaling
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+keywords:
+  - machine-learning
+  - inference
+  - gpu
+  - autoscaling
+  - kubernetes
+home: https://github.com/hyperion-ml/hyperion
+sources:
+  - https://github.com/hyperion-ml/hyperion
+maintainers:
+  - name: Hyperion Team
+    email: team@hyperion-ml.com
+dependencies:
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: keda
+    version: "2.x.x"
+    repository: https://kedacore.github.io/charts
+    condition: keda.enabled
+annotations:
+  category: MachineLearning
