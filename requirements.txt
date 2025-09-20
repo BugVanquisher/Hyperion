@@ -6,3 +6,8 @@ pydantic==2.8.2
 torch>=2.0.0
 transformers>=4.30.0
 accelerate>=0.20.0
+
+# Performance testing dependencies
+aiohttp>=3.8.0
+matplotlib>=3.5.0
+numpy>=1.21.0
