@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyperion-app-gpu
+  namespace: hyperion
+  labels:
+    app: hyperion-app
+    tier: gpu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hyperion-app
+      tier: gpu
+  template:
+    metadata:
+      labels:
+        app: hyperion-app
+        tier: gpu
+    spec:
+      containers:
+      - name: app
+        image: hyperion:gpu
+        ports:
+        - containerPort: 8000
+        env:
+        - name: REDIS_URL
+          value: "redis://hyperion-redis:6379/0"
+        - name: MODEL_NAME
+          value: "microsoft/DialoGPT-small"
+        - name: DEVICE_TYPE
+          value: "auto"
+        - name: BATCH_SIZE
+          value: "4"
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "8Gi"
+            cpu: "4"
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: model-cache
+          mountPath: /home/appuser/.cache
+      volumes:
+      - name: model-cache
+        emptyDir:
+          sizeLimit: 10Gi
+      nodeSelector:
+        accelerator: nvidia-tesla-k80  # Update based on your GPU nodes
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hyperion-app-gpu
+  namespace: hyperion
+  labels:
+    app: hyperion-app
+    tier: gpu
+spec:
+  selector:
+    app: hyperion-app
+    tier: gpu
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP

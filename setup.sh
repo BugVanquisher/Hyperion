@@ -63,16 +63,24 @@ print_status "All prerequisites met!"
 
 # Function to build and start services
 start_services() {
+    local use_gpu=${1:-false}
     echo ""
-    echo "🔨 Building and starting services..."
-    
+
+    if [ "$use_gpu" = "true" ]; then
+        echo "🚀 Building and starting GPU-enabled services..."
+        COMPOSE_FILE="docker-compose.gpu.yml"
+    else
+        echo "🔨 Building and starting CPU services..."
+        COMPOSE_FILE="docker-compose.yml"
+    fi
+
     cd deploy/docker
-    
+
     # Stop any existing containers
-    docker-compose down -v 2>/dev/null || true
-    
+    docker-compose -f $COMPOSE_FILE down -v 2>/dev/null || true
+
     # Build and start services
-    docker-compose up --build -d
+    docker-compose -f $COMPOSE_FILE up --build -d
     
     print_status "Services started!"
     
@@ -85,8 +93,8 @@ start_services() {
     attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
-        if docker-compose exec -T app curl -f http://localhost:8000/healthz &> /dev/null; then
-            health_response=$(docker-compose exec -T app curl -s http://localhost:8000/healthz)
+        if docker-compose -f $COMPOSE_FILE exec -T app curl -f http://localhost:8000/healthz &> /dev/null; then
+            health_response=$(docker-compose -f $COMPOSE_FILE exec -T app curl -s http://localhost:8000/healthz)
             if echo "$health_response" | grep -q '"ok":true'; then
                 print_status "Hyperion is ready!"
                 break
@@ -96,16 +104,16 @@ start_services() {
         else
             echo "  Attempt $((attempt + 1)): Service starting..."
         fi
-        
+
         sleep 3
         attempt=$((attempt + 1))
     done
-    
+
     if [ $attempt -eq $max_attempts ]; then
         print_error "Service failed to start within timeout"
         echo ""
         echo "Logs from the app container:"
-        docker-compose logs app
+        docker-compose -f $COMPOSE_FILE logs app
         exit 1
     fi
     
@@ -283,25 +291,37 @@ show_help() {
     echo "Usage: $0 [command]"
     echo ""
     echo "Commands:"
-    echo "  start     - Build and start all services"
-    echo "  stop      - Stop all services"
-    echo "  restart   - Restart all services"
-    echo "  test      - Run API tests"
-    echo "  logs      - Show service logs"
-    echo "  status    - Show service status"
-    echo "  help      - Show this help message"
+    echo "  start       - Build and start all services (CPU)"
+    echo "  start-gpu   - Build and start GPU-enabled services"
+    echo "  stop        - Stop all services"
+    echo "  restart     - Restart all services (CPU)"
+    echo "  restart-gpu - Restart GPU-enabled services"
+    echo "  test        - Run API tests"
+    echo "  logs        - Show service logs"
+    echo "  status      - Show service status"
+    echo "  help        - Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 start    # Start services"
-    echo "  $0 test     # Run tests"
-    echo "  $0 logs     # View logs"
+    echo "  $0 start        # Start CPU services"
+    echo "  $0 start-gpu    # Start GPU services (requires NVIDIA Docker)"
+    echo "  $0 test         # Run tests"
+    echo "  $0 logs         # View logs"
     echo ""
 }
 
 # Main script logic
 case "${1:-start}" in
     "start")
-        start_services
+        start_services false
+        show_status
+        ;;
+    "start-gpu")
+        echo "🔍 Checking NVIDIA Docker support..."
+        if ! docker info | grep -q "nvidia"; then
+            print_warning "NVIDIA Docker runtime not detected. GPU features may not work."
+            echo "Install nvidia-container-toolkit for full GPU support."
+        fi
+        start_services true
         show_status
         ;;
     "stop")
@@ -309,7 +329,12 @@ case "${1:-start}" in
         ;;
     "restart")
         stop_services
-        start_services
+        start_services false
+        show_status
+        ;;
+    "restart-gpu")
+        stop_services
+        start_services true
         show_status
         ;;
     "test")
