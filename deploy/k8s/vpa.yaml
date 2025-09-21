@@ -1,0 +1,73 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: hyperion-app-vpa
+  namespace: hyperion
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyperion-app
+  updatePolicy:
+    updateMode: "Auto"  # Automatically apply recommendations
+  resourcePolicy:
+    containerPolicies:
+    - containerName: app
+      minAllowed:
+        cpu: 100m
+        memory: 512Mi
+      maxAllowed:
+        cpu: 4
+        memory: 8Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: hyperion-app-gpu-vpa
+  namespace: hyperion
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyperion-app-gpu
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: app
+      minAllowed:
+        cpu: 500m
+        memory: 2Gi
+        nvidia.com/gpu: 1
+      maxAllowed:
+        cpu: 8
+        memory: 16Gi
+        nvidia.com/gpu: 1
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: hyperion-redis-vpa
+  namespace: hyperion
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyperion-redis
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: redis
+      minAllowed:
+        cpu: 50m
+        memory: 128Mi
+      maxAllowed:
+        cpu: 1
+        memory: 4Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits

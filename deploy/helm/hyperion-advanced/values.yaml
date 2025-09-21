@@ -1,0 +1,179 @@
+# Hyperion Advanced Configuration
+# Default values for hyperion-advanced
+
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Application configuration
+app:
+  image:
+    registry: docker.io
+    repository: hyperion
+    tag: "local"
+    pullPolicy: IfNotPresent
+
+  # GPU configuration
+  gpu:
+    enabled: false
+    image:
+      tag: "gpu"
+    nodeSelector:
+      accelerator: nvidia-tesla-k80
+    tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+
+  # Environment variables
+  env:
+    MODEL_NAME: "microsoft/DialoGPT-small"
+    DEVICE_TYPE: "auto"
+    BATCH_SIZE: "4"
+    BATCH_WAIT_TIME: "0.1"
+    ENABLE_BATCHING: "true"
+
+  # Resource configuration
+  resources:
+    limits:
+      cpu: 4
+      memory: 8Gi
+    requests:
+      cpu: 2
+      memory: 4Gi
+
+  # GPU-specific resources
+  gpuResources:
+    limits:
+      nvidia.com/gpu: 1
+      cpu: 8
+      memory: 16Gi
+    requests:
+      nvidia.com/gpu: 1
+      cpu: 4
+      memory: 8Gi
+
+# Autoscaling configuration
+autoscaling:
+  # Horizontal Pod Autoscaler
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  # GPU-specific HPA
+  gpuHpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 75
+
+  # Vertical Pod Autoscaler
+  vpa:
+    enabled: true
+    updateMode: "Auto"  # Auto, Recreation, Off
+
+  # KEDA (Kubernetes Event-driven Autoscaling)
+  keda:
+    enabled: true
+    pollingInterval: 30
+    cooldownPeriod: 300
+    idleReplicaCount: 1
+    minReplicas: 1
+    maxReplicas: 15
+
+    # GPU KEDA scaling
+    gpu:
+      enabled: true
+      pollingInterval: 15
+      cooldownPeriod: 600
+      idleReplicaCount: 0
+      minReplicas: 0
+      maxReplicas: 5
+
+    triggers:
+      redis:
+        enabled: true
+        listLength: "5"
+      prometheus:
+        enabled: true
+        serverAddress: "http://prometheus:9090"
+        threshold: "10"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: hyperion.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# Security
+security:
+  podSecurityPolicy:
+    enabled: false
+  networkPolicy:
+    enabled: false
+
+# Node affinity and scheduling
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Additional labels and annotations
+labels: {}
+annotations: {}
+
+# Performance tuning
+performance:
+  # JVM-like settings for Python
+  pythonOptimization: true
+  # Enable model optimization
+  modelOptimization:
+    enabled: true
+    quantization: false
+    tensorrt: false
+  # Caching configuration
+  cache:
+    enabled: true
+    ttl: 300  # 5 minutes
+
+# Development settings
+development:
+  enabled: false
+  debug: false
+  profiling: false

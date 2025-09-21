@@ -7,8 +7,9 @@ import time
 import logging
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import PlainTextResponse, JSONResponse
-from .models.llm import generate_text, init_model, health_check
+from .models.llm import generate_text, init_model, health_check, get_device_info
 from .cache import get_cache, cache_key
+from .batching import get_batcher
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +51,15 @@ CACHE_REQUESTS = Counter(
     "Cache requests",
     ["status"]  # hit/miss
 )
+BATCH_REQUESTS = Counter(
+    "batch_requests_total",
+    "Requests processed through batching",
+    ["batch_size"]
+)
+BATCH_WAIT_TIME = Histogram(
+    "batch_wait_time_seconds",
+    "Time requests spend waiting in batch queue"
+)
 
 class ChatRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000, description="Input text prompt")
@@ -68,6 +78,7 @@ class HealthResponse(BaseModel):
     version: str
     model_loaded: bool
     timestamp: str
+    device_info: dict
 
 # Global startup flag
 model_loading_complete = False
@@ -118,12 +129,13 @@ async def prometheus_middleware(request, call_next):
 async def healthz():
     """Health check endpoint with detailed status."""
     model_healthy = await health_check() if model_loading_complete else False
-    
+
     return HealthResponse(
         ok=model_loading_complete and model_healthy,
         version=app.version,
         model_loaded=model_loading_complete,
-        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        device_info=get_device_info()
     )
 
 @app.get("/readiness")
@@ -173,19 +185,34 @@ async def chat(req: ChatRequest):
     except Exception as e:
         logger.warning(f"Cache error: {str(e)}. Proceeding without cache.")
     
-    # Perform inference
+    # Perform inference using batching
     start_time = time.time()
     try:
-        with INFERENCE_DURATION.labels(model_name="current_model").time():
-            text, tokens, model_name = await generate_text(
-                req.prompt, 
-                req.max_tokens, 
-                req.temperature
+        batcher = get_batcher()
+        request_id = f"{int(time.time() * 1000)}_{hash(req.prompt) % 10000}"
+
+        with BATCH_WAIT_TIME.time():
+            batch_result = await batcher.add_request(
+                prompt=req.prompt,
+                max_tokens=req.max_tokens,
+                temperature=req.temperature,
+                request_id=request_id
             )
+
+        # Record batch metrics
+        batch_stats = batcher.get_stats()
+        if batch_stats["total_batches"] > 0:
+            avg_batch_size = int(batch_stats["avg_requests_per_batch"])
+            BATCH_REQUESTS.labels(batch_size=str(avg_batch_size)).inc()
+
+        text = batch_result.response
+        tokens = batch_result.tokens_used
+        model_name = batch_result.model_name
+
     except Exception as e:
         logger.error(f"Inference failed: {str(e)}")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Inference failed: {str(e)}"
         )
     
@@ -222,6 +249,14 @@ async def list_models():
         ]
     }
 
+@app.get("/v1/batch/stats")
+async def batch_stats():
+    """Get current batching statistics."""
+    batcher = get_batcher()
+    stats = batcher.get_stats()
+    stats.update(get_device_info())
+    return stats
+
 # Add a simple root endpoint
 @app.get("/")
 async def root():
@@ -232,8 +267,9 @@ async def root():
         "status": "running",
         "endpoints": {
             "health": "/healthz",
-            "metrics": "/metrics", 
+            "metrics": "/metrics",
             "chat": "/v1/llm/chat",
-            "models": "/v1/models"
+            "models": "/v1/models",
+            "batch_stats": "/v1/batch/stats"
         }
     }

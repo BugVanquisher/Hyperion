@@ -1,0 +1,105 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hyperion-app-hpa
+  namespace: hyperion
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyperion-app
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics scaling (requires metrics server)
+  - type: Pods
+    pods:
+      metric:
+        name: inference_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "5"  # Scale when > 5 req/s per pod
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 min cooldown
+      policies:
+      - type: Percent
+        value: 50  # Scale down max 50% at once
+        periodSeconds: 60
+      - type: Pods
+        value: 2  # Or max 2 pods at once
+        periodSeconds: 60
+      selectPolicy: Min  # Take conservative approach
+    scaleUp:
+      stabilizationWindowSeconds: 60  # 1 min cooldown
+      policies:
+      - type: Percent
+        value: 100  # Scale up max 100% at once
+        periodSeconds: 30
+      - type: Pods
+        value: 3  # Or max 3 pods at once
+        periodSeconds: 30
+      selectPolicy: Max  # Take aggressive approach
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hyperion-app-gpu-hpa
+  namespace: hyperion
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hyperion-app-gpu
+  minReplicas: 1
+  maxReplicas: 3  # Limited by GPU availability
+  metrics:
+  # GPU-specific scaling
+  - type: Resource
+    resource:
+      name: nvidia.com/gpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Memory for GPU workloads
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  # Custom GPU metrics
+  - type: Pods
+    pods:
+      metric:
+        name: gpu_inference_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "10"  # GPU can handle more req/s
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 min cooldown for GPU
+      policies:
+      - type: Pods
+        value: 1  # Scale down 1 GPU pod at a time
+        periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 30  # Quick scale up for GPU
+      policies:
+      - type: Pods
+        value: 1  # Scale up 1 GPU pod at a time
+        periodSeconds: 30
