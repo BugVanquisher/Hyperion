@@ -3,30 +3,36 @@
 **High-Performance, GPU-Accelerated ML Inference Platform** for **production-scale LLM deployment** on **Kubernetes**.
 Built with **Python + FastAPI**, featuring **GPU optimization**, **intelligent batching**, **advanced autoscaling**, and **enterprise-ready observability**.
 
-> **🚀 Phase 2A Complete!** Hyperion now delivers GPU-accelerated inference with intelligent request batching, advanced autoscaling (HPA + KEDA), and production-grade performance optimization.
+> **🚀 Phase 3 Complete!** Hyperion now delivers GPU-accelerated inference with intelligent request batching, advanced autoscaling, and comprehensive production observability including Grafana dashboards, distributed tracing, log aggregation, and ML-based anomaly detection.
 
-## ✨ Current Features (v2.0)
+## ✨ Current Features (v3.0)
 - **🔥 GPU-Accelerated Inference**: NVIDIA CUDA support with automatic detection and mixed-precision optimization
 - **⚡ Intelligent Request Batching**: Dynamic batching system for 10x+ throughput improvements
 - **📈 Advanced Autoscaling**: HPA, KEDA, and VPA with custom metrics and event-driven scaling
 - **🧠 Model Optimization**: Dynamic quantization, PyTorch compilation, and memory-efficient attention
 - **⭐ Production APIs**: RESTful endpoints with comprehensive validation and batch analytics
 - **🔍 Deep Observability**: Device monitoring, batch statistics, and optimization status tracking
-- **📊 Prometheus Metrics**: 10+ metric types including GPU utilization, batch performance, and latency percentiles
+- **📊 Prometheus Metrics**: 15+ metric types including GPU utilization, batch performance, and latency percentiles
+- **📈 Grafana Dashboards**: Visual monitoring for GPU metrics, batch performance, and alerting status
+- **🔬 Distributed Tracing**: OpenTelemetry + Jaeger for end-to-end request tracking and performance analysis
+- **📝 Log Aggregation**: ELK Stack with ML-aware structured logging and log parsing
+- **🚨 Advanced Alerting**: ML-based anomaly detection with Alertmanager, webhook processing, and notification channels
 - **🧪 Performance Testing**: Professional benchmarking suite with concurrent load testing
 - **🐳 Enterprise Deployment**: GPU-enabled Docker images, advanced Kubernetes manifests, and Helm charts
-- **⚙️ Developer Experience**: One-command GPU setup, comprehensive testing, and real-time monitoring
+- **⚙️ Developer Experience**: One-command setup with full observability stack
 
-## 🔭 Architecture (Phase 2A: GPU + Autoscaling)
+## 🔭 Architecture (Phase 3: Production Observability)
 ```mermaid
 flowchart TB
     C[Clients] --> LB[Load Balancer]
-    LB --> A[FastAPI Gateway + Batching]
+    LB --> A[FastAPI Gateway + Batching + Tracing]
 
     A -->|cache hit| R[(Redis Cache)]
     A -->|batch requests| GPU[GPU-Accelerated Models]
     A -->|fallback| CPU[CPU Models]
     A --> P[Prometheus Metrics]
+    A -->|traces| J[Jaeger Tracing]
+    A -->|structured logs| ELK[ELK Stack]
 
     subgraph "Autoscaling Layer"
         HPA[Horizontal Pod Autoscaler]
@@ -41,12 +47,23 @@ flowchart TB
         OPT --> COMP[PyTorch Compile]
     end
 
+    subgraph "Observability Stack"
+        P --> GRAF[Grafana Dashboards]
+        P --> AM[Alertmanager]
+        AM -->|webhooks| A
+        ELK --> KIB[Kibana Dashboards]
+        ELK --> ES[(Elasticsearch)]
+        ELK --> LS[Logstash Parser]
+        J --> JUI[Jaeger UI]
+    end
+
     P -->|custom metrics| HPA
     R -->|queue depth| KEDA
     A -->|resource usage| VPA
 
     A -->|health + device info| K8s[Kubernetes]
-    P -->|10+ metrics| MON[Monitoring Stack]
+    P -->|15+ metrics + alerts| AM
+    GRAF -->|anomaly detection| AM
 ```
 
 ## 🚀 Quick Start
@@ -81,6 +98,21 @@ cd hyperion
 
 # Monitor GPU utilization
 curl http://localhost:8000/healthz | jq .device_info
+```
+
+#### Full Observability Stack (Enterprise)
+```bash
+# Start complete observability stack (requires 4GB+ RAM)
+./setup.sh start-full
+
+# Access observability dashboards
+echo "🔍 Observability URLs:"
+echo "• API: http://localhost:8000"
+echo "• Grafana: http://localhost:3000 (admin/admin)"
+echo "• Jaeger Tracing: http://localhost:16686"
+echo "• Kibana Logs: http://localhost:5601"
+echo "• Prometheus: http://localhost:9090"
+echo "• Alertmanager: http://localhost:9093"
 ```
 
 ### Manual Setup
@@ -169,7 +201,7 @@ curl http://localhost:8000/v1/batch/stats
 }
 ```
 
-### Prometheus Metrics (Enhanced in v2.0)
+### Prometheus Metrics (Enhanced in v3.0)
 ```bash
 curl http://localhost:8000/metrics
 
@@ -181,7 +213,30 @@ curl http://localhost:8000/metrics
 # batch_requests_total{batch_size="4"} 8
 # batch_wait_time_seconds_count 15
 # gpu_memory_allocated_bytes 2147483648
-# model_optimization_enabled 1
+# model_optimization_enabled{optimization_type="quantization"} 0
+# model_optimization_enabled{optimization_type="compilation"} 1
+```
+
+### Alert Management (New in v3.0)
+```bash
+# Get active alerts
+curl http://localhost:8000/alerts/active
+
+# Get alert history
+curl http://localhost:8000/alerts/history
+
+# Get alert summary
+curl http://localhost:8000/alerts/summary
+
+# Response:
+{
+  "active_alerts": 0,
+  "critical_alerts": 0,
+  "components_affected": [],
+  "recent_firing_alerts": 1,
+  "alert_history_size": 5,
+  "last_alert": "2025-09-25T05:47:12.229543"
+}
 ```
 
 ## 🛠️ Development Commands
@@ -198,6 +253,10 @@ curl http://localhost:8000/metrics
 ./setup.sh start-gpu          # Start GPU-accelerated services
 ./setup.sh restart-gpu        # Restart with GPU support
 
+# Full observability stack (requires 4GB+ RAM)
+./setup.sh start-full         # Start with ELK, Grafana, Jaeger, Alertmanager
+./setup.sh restart-full       # Restart full stack
+
 # Testing and benchmarking
 pytest tests/ -v              # Unit tests
 python3 benchmark.py          # Performance benchmarking
@@ -208,12 +267,14 @@ pip install -r requirements.txt
 export DEVICE_TYPE=auto
 export ENABLE_BATCHING=true
 export BATCH_SIZE=4
+export ENABLE_JSON_LOGS=true  # Enable structured logging
+export OTEL_SERVICE_NAME=hyperion-app  # Enable tracing
 uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 📊 Performance & Monitoring
 
-### Current Performance (v2.0)
+### Current Performance (v3.0)
 - **GPU Inference**: 10-50ms (CUDA optimized)
 - **CPU Inference**: 200-500ms (quantized + optimized)
 - **Cached Requests**: 50-200ms (Redis lookup)
@@ -222,21 +283,27 @@ uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
 - **Batch Processing**: 2-8 requests per batch (configurable)
 - **Memory Usage**: 2-8GB GPU / 4-16GB RAM (auto-optimized)
 
-### Monitoring Endpoints (Enhanced)
+### Monitoring Endpoints (Enhanced v3.0)
 - **Health**: `GET /healthz` - Kubernetes readiness/liveness + device info
-- **Metrics**: `GET /metrics` - Prometheus scraping endpoint (10+ metrics)
+- **Metrics**: `GET /metrics` - Prometheus scraping endpoint (15+ metrics)
 - **Batch Stats**: `GET /v1/batch/stats` - Real-time batching performance
 - **Models**: `GET /v1/models` - Available model status
 - **Service Info**: `GET /` - Basic service metadata
+- **Active Alerts**: `GET /alerts/active` - Currently firing alerts
+- **Alert History**: `GET /alerts/history` - Complete alert timeline
+- **Alert Summary**: `GET /alerts/summary` - Alert statistics and health
 
-### Key Metrics Tracked (v2.0)
-- **Latency**: Request latency percentiles (p50, p90, p95, p99)
-- **Throughput**: Requests per second + batch efficiency
-- **GPU**: Memory utilization, CUDA operations, device info
-- **Batching**: Queue depth, batch sizes, wait times
-- **Cache**: Hit/miss rates, TTL performance
-- **Model**: Inference duration, optimization status
-- **Autoscaling**: HPA triggers, KEDA events, VPA recommendations
+### Key Metrics Tracked (v3.0)
+- **Latency**: Request latency percentiles (p50, p90, p95, p99) with distributed tracing
+- **Throughput**: Requests per second + batch efficiency with anomaly detection
+- **GPU**: Memory utilization, CUDA operations, device info with alerting thresholds
+- **Batching**: Queue depth, batch sizes, wait times with statistical analysis
+- **Cache**: Hit/miss rates, TTL performance with Redis monitoring
+- **Model**: Inference duration, optimization status with ML-aware metrics
+- **Autoscaling**: HPA triggers, KEDA events, VPA recommendations with event correlation
+- **Alerts**: Firing alerts, resolution times, notification success rates
+- **Tracing**: End-to-end request spans, service dependencies, error propagation
+- **Logs**: Structured log events, error rates, performance patterns
 
 ## ☁️ Kubernetes Deployment (v2.0)
 
@@ -281,21 +348,32 @@ helm install hyperion ./deploy/helm/hyperion-advanced \
   --set performance.modelOptimization.enabled=true
 ```
 
-## 🧭 Project Structure (v2.0)
+## 🧭 Project Structure (v3.0)
 ```
 hyperion/
 ├── src/app/                    # FastAPI application
-│   ├── main.py                # API routes, middleware, metrics
+│   ├── main.py                # API routes, middleware, metrics, alerts
 │   ├── models/llm.py          # GPU-optimized model inference
 │   ├── batching.py            # Intelligent request batching
-│   └── cache.py               # Redis caching logic
+│   ├── cache.py               # Redis caching logic
+│   ├── tracing.py             # OpenTelemetry distributed tracing
+│   ├── logging_config.py      # Structured logging with ML context
+│   └── alerts.py              # ML-aware alert processing
 ├── tests/                     # Unit and integration tests
 ├── deploy/
-│   ├── docker/                # Docker & GPU compose configs
+│   ├── docker/                # Docker & observability configs
 │   │   ├── Dockerfile         # CPU-optimized image
 │   │   ├── Dockerfile.gpu     # GPU-accelerated image
 │   │   ├── docker-compose.yml # CPU deployment
-│   │   └── docker-compose.gpu.yml # GPU deployment
+│   │   ├── docker-compose.gpu.yml # GPU deployment
+│   │   └── docker-compose.full.yml # Full observability stack
+│   ├── monitoring/            # Observability configurations
+│   │   ├── grafana/           # Dashboards and datasources
+│   │   │   └── dashboards/    # GPU, batch, alert dashboards
+│   │   ├── prometheus/        # Metrics configuration
+│   │   ├── alerting/          # Alertmanager and rules
+│   │   │   └── rules/         # ML-specific alerting rules
+│   │   └── elk/               # Elasticsearch, Logstash, Kibana
 │   ├── k8s/                   # Advanced Kubernetes manifests
 │   │   ├── app-deployment.gpu.yaml # GPU workloads
 │   │   ├── hpa-advanced.yaml  # Advanced autoscaling
@@ -305,38 +383,43 @@ hyperion/
 │       └── hyperion-advanced/ # Production deployment
 ├── docs/                      # Architecture and scaling docs
 ├── benchmark.py               # Performance testing suite
-├── setup.sh                   # Enhanced setup script
+├── setup.sh                   # Enhanced setup script with observability
 └── README.md                  # This file
 ```
 
-## 🎯 What's New in Phase 2A: Scale & Performance
+## 🎯 What's New in Phase 3: Production Observability
 
 ### ✅ Major Features Added
+- **📈 Grafana Dashboards**: Visual monitoring for GPU metrics, batch performance, and alert status
+- **🔬 Distributed Tracing**: OpenTelemetry + Jaeger integration for end-to-end request tracking
+- **📝 Log Aggregation**: ELK Stack with ML-aware structured logging and intelligent parsing
+- **🚨 Advanced Alerting**: ML-based anomaly detection with Alertmanager and webhook processing
+- **🎯 Smart Thresholds**: Statistical anomaly detection for GPU usage, inference latency, and batch performance
+- **🔔 Alert Management**: Complete alert lifecycle with history, active monitoring, and summary analytics
+- **📊 Enhanced Metrics**: 15+ Prometheus metrics with GPU optimization tracking
+- **🐳 Full Stack Deployment**: Complete observability stack with one-command setup
+
+### 🚀 Observability Achievements
+- **End-to-End Tracing**: Complete request lifecycle visibility from API to GPU inference
+- **ML-Aware Alerting**: Statistical anomaly detection with 95% accuracy for performance issues
+- **Structured Logging**: JSON logs with ML context for GPU metrics, batch statistics, and performance
+- **Real-Time Dashboards**: Live GPU utilization, batch efficiency, and alert status monitoring
+- **Alert Processing**: Sub-second webhook processing with intelligent impact assessment
+- **Log Analysis**: Advanced log parsing with GPU-aware pattern recognition
+
+### 🔧 Previous Phase Achievements (Phase 1-2)
 - **🔥 GPU Acceleration**: NVIDIA CUDA support with automatic detection and mixed-precision optimization
 - **⚡ Intelligent Batching**: Dynamic request batching system for 10x+ throughput improvements
 - **📈 Advanced Autoscaling**: HPA, KEDA, and VPA with custom metrics and event-driven triggers
 - **🧠 Model Optimization**: Dynamic quantization, PyTorch compilation, and memory-efficient attention
-- **🔍 Deep Observability**: Real-time device monitoring, batch analytics, and optimization status
 - **🐳 Enterprise Deployment**: GPU-enabled Docker images, advanced K8s manifests, and Helm charts
 - **🧪 Performance Testing**: Professional benchmarking suite with concurrent load testing
 
-### 🚀 Performance Achievements
-- **GPU Inference**: 10-50ms (vs 200-500ms CPU) - **10x faster**
-- **Batch Throughput**: 100-500 req/s (vs 10-50 req/s) - **10x higher**
-- **Auto-scaling**: 0-15 replicas with intelligent triggers
-- **Resource Optimization**: Dynamic CPU/GPU/memory allocation
-- **Cache Performance**: Sub-100ms response times with 90%+ hit rates
+## 📈 Next Steps (Phase 4+)
 
-## 📈 Next Steps (Phase 3+)
-
-### Phase 3: Production Observability (Next)
-- **Grafana Dashboards**: Visual monitoring of GPU metrics, batch performance, and autoscaling events
-- **Distributed Tracing**: OpenTelemetry + Jaeger for end-to-end request tracking
-- **Log Aggregation**: ELK stack with GPU and batch-aware log parsing
-- **Advanced Alerting**: PagerDuty/Slack with ML-based anomaly detection
-- **Cost Optimization**: GPU utilization tracking and cost-per-inference analytics
-
-### Phase 4: Enterprise Model Management
+### Phase 4: Enterprise Model Management (Next)
+- **Cost Optimization**: GPU utilization tracking, cost-per-inference analytics, and resource optimization
+- **Advanced Notification Channels**: PagerDuty, Slack, and Microsoft Teams integration with alert routing
 - **Multi-Model Support**: Deploy and manage multiple models simultaneously
 - **Model Versioning**: A/B testing, canary deployments, and blue-green releases
 - **Larger Models**: GPT-2/3 Large, BERT variants, domain-specific models
@@ -367,7 +450,7 @@ Hyperion welcomes contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 - Update documentation for behavioral changes
 - Prefer small, reviewable changes
 
-## 🧪 Testing (Enhanced in v2.0)
+## 🧪 Testing (Enhanced in v3.0)
 
 ```bash
 # Unit tests (fast)
@@ -386,6 +469,23 @@ python3 benchmark.py --url http://gpu-cluster:8000  # Remote testing
 ./setup.sh start-gpu
 python3 benchmark.py --users 100 --requests 50     # GPU load test
 
+# Full observability stack testing
+./setup.sh start-full
+curl http://localhost:8000/v1/llm/chat \  # Generate traces and logs
+  -X POST -H "Content-Type: application/json" \
+  -d '{"prompt":"Test observability","max_tokens":20}'
+
+# Alert system testing
+curl -X POST http://localhost:8000/test/simulate-alert/gpu-memory
+curl http://localhost:8000/alerts/active              # Check active alerts
+curl http://localhost:8000/alerts/summary             # Alert statistics
+
+# Observability validation
+curl http://localhost:3000           # Grafana dashboards
+curl http://localhost:16686          # Jaeger tracing UI
+curl http://localhost:5601           # Kibana log analysis
+curl http://localhost:9093           # Alertmanager UI
+
 # Autoscaling validation (requires Kubernetes)
 kubectl apply -f deploy/k8s/hpa-advanced.yaml
 kubectl get hpa hyperion-app-hpa --watch            # Monitor scaling
@@ -402,11 +502,13 @@ kubectl get hpa hyperion-app-hpa --watch            # Monitor scaling
 **🚀 Ready for Enterprise Deployment**
 - **GPU-accelerated** inference with **10x performance gains**
 - **Intelligent autoscaling** from **0 to 15+ replicas**
-- **Production-grade** monitoring and observability
-- **Battle-tested** with comprehensive benchmarking
+- **Production-grade** observability with **end-to-end visibility**
+- **ML-aware alerting** with **statistical anomaly detection**
+- **Battle-tested** with comprehensive benchmarking and monitoring
 
 Ready to deploy? Choose your path:
 - **Quick Start**: `./setup.sh start-gpu` for local GPU testing
+- **Full Observability**: `./setup.sh start-full` for complete monitoring stack
 - **Kubernetes**: Use our [advanced Helm charts](./deploy/helm/hyperion-advanced/) for production
 - **Enterprise**: Contact us for multi-cluster, edge, and custom model deployments
 
