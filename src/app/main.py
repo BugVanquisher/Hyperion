@@ -5,7 +5,7 @@ from typing import Optional
 import os
 import time
 import logging
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import PlainTextResponse, JSONResponse
 from .models.llm import generate_text, init_model, health_check, get_device_info
 from .cache import get_cache, cache_key
@@ -59,6 +59,21 @@ BATCH_REQUESTS = Counter(
 BATCH_WAIT_TIME = Histogram(
     "batch_wait_time_seconds",
     "Time requests spend waiting in batch queue"
+)
+
+# GPU Metrics
+GPU_MEMORY_ALLOCATED = Gauge(
+    "gpu_memory_allocated_bytes",
+    "GPU memory currently allocated"
+)
+GPU_MEMORY_TOTAL = Gauge(
+    "gpu_memory_total_bytes",
+    "Total GPU memory available"
+)
+MODEL_OPTIMIZATION_ENABLED = Gauge(
+    "model_optimization_enabled",
+    "Whether model optimization is enabled",
+    ["optimization_type"]
 )
 
 class ChatRequest(BaseModel):
@@ -145,11 +160,41 @@ async def readiness():
         raise HTTPException(status_code=503, detail="Model not yet loaded")
     return {"ready": True}
 
+def update_gpu_metrics():
+    """Update GPU-related Prometheus metrics."""
+    import torch
+    try:
+        device_info = get_device_info()
+
+        if 'gpu_memory_allocated' in device_info:
+            # Parse memory values (remove 'GB' and convert to bytes)
+            allocated_gb = float(device_info['gpu_memory_allocated'].replace('GB', ''))
+            total_gb = float(device_info['gpu_memory_total'].replace('GB', ''))
+
+            GPU_MEMORY_ALLOCATED.set(allocated_gb * 1e9)
+            GPU_MEMORY_TOTAL.set(total_gb * 1e9)
+
+        # Update optimization metrics
+        if 'optimizations' in device_info:
+            opts = device_info['optimizations']
+            MODEL_OPTIMIZATION_ENABLED.labels(optimization_type='quantization').set(
+                1 if opts.get('quantization_enabled', False) else 0
+            )
+            MODEL_OPTIMIZATION_ENABLED.labels(optimization_type='compilation').set(
+                1 if opts.get('optimization_enabled', False) else 0
+            )
+
+    except Exception as e:
+        logger.warning(f"Failed to update GPU metrics: {str(e)}")
+
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint."""
+    # Update GPU metrics before generating response
+    update_gpu_metrics()
+
     return PlainTextResponse(
-        generate_latest(), 
+        generate_latest(),
         media_type=CONTENT_TYPE_LATEST
     )
 
