@@ -270,6 +270,8 @@ show_status() {
         echo "  • API: http://localhost:8000"
         echo "  • Health: http://localhost:8000/healthz"
         echo "  • Metrics: http://localhost:8000/metrics"
+        echo "  • Grafana: http://localhost:3000 (admin/admin)"
+        echo "  • Prometheus: http://localhost:9090"
         echo "  • Redis: localhost:6379"
         echo ""
         echo "To view logs: ./setup.sh logs"

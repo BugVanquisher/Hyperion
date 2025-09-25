@@ -1,0 +1,177 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Hyperion GPU Metrics",
+    "tags": ["hyperion", "gpu", "inference"],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "hideControls": false,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+      {
+        "id": 1,
+        "title": "GPU Memory Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "gpu_memory_allocated_bytes",
+            "refId": "A",
+            "legendFormat": "Allocated"
+          },
+          {
+            "expr": "gpu_memory_total_bytes",
+            "refId": "B",
+            "legendFormat": "Total"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "color": {"mode": "palette-classic"},
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "vis": false
+              }
+            },
+            "unit": "bytes"
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Model Inference Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(model_inference_duration_seconds_sum[5m]) / rate(model_inference_duration_seconds_count[5m])",
+            "refId": "A",
+            "legendFormat": "Avg Inference Time"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "yAxes": [
+          {
+            "label": "Duration (seconds)",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "points": false,
+        "pointradius": 2
+      },
+      {
+        "id": 3,
+        "title": "GPU Device Info",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "gpu_info",
+            "refId": "A",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "__name__": true
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Request Latency Percentiles",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_latency_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "50th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.90, rate(http_request_latency_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "90th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_latency_seconds_bucket[5m]))",
+            "refId": "C",
+            "legendFormat": "99th percentile"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "yAxes": [
+          {
+            "label": "Latency (seconds)",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Requests per Second",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[1m])",
+            "refId": "A",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          },
+          {
+            "show": false
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "10s",
+    "schemaVersion": 27,
+    "version": 0
+  }
+}
