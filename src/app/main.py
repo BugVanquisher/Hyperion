@@ -4,18 +4,29 @@ from pydantic import BaseModel, Field
 from typing import Optional
 import os
 import time
-import logging
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import PlainTextResponse, JSONResponse
 from .models.llm import generate_text, init_model, health_check, get_device_info
 from .cache import get_cache, cache_key
 from .batching import get_batcher
 from .tracing import instrument_app, trace_operation, add_span_attributes, get_trace_id
+from .logging_config import (
+    setup_structured_logging, get_ml_logger, log_gpu_metrics,
+    log_batch_metrics, log_inference_metrics, log_cache_operation
+)
+from .alerts import AlertmanagerWebhook, alert_processor
 from opentelemetry import trace
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Set up structured logging
+enable_json_logging = os.getenv("ENABLE_JSON_LOGS", "true").lower() == "true"
+logger = setup_structured_logging(
+    service_name="hyperion-app",
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    enable_json=enable_json_logging
+)
+
+# Get ML-aware logger
+ml_logger = get_ml_logger("hyperion.ml", service="hyperion-app")
 
 app = FastAPI(
     title="Hyperion - ML Inference Platform",
@@ -179,6 +190,9 @@ def update_gpu_metrics():
             GPU_MEMORY_ALLOCATED.set(allocated_gb * 1e9)
             GPU_MEMORY_TOTAL.set(total_gb * 1e9)
 
+            # Log GPU metrics in structured format
+            log_gpu_metrics(ml_logger, device_info)
+
         # Update optimization metrics
         if 'optimizations' in device_info:
             opts = device_info['optimizations']
@@ -244,11 +258,12 @@ async def chat(req: ChatRequest):
                         "response_cached": True
                     })
 
-                    logger.info(f"Cache hit for prompt: '{req.prompt[:50]}...'")
+                    log_cache_operation(ml_logger, "lookup", key, hit=True)
                     return ChatResponse(**cached_data)
                 else:
                     CACHE_REQUESTS.labels(status="miss").inc()
                     add_span_attributes(span, {"cache_hit": False})
+                    log_cache_operation(ml_logger, "lookup", key, hit=False)
 
             except Exception as e:
                 logger.warning(f"Cache error: {str(e)}. Proceeding without cache.")
@@ -294,6 +309,9 @@ async def chat(req: ChatRequest):
                     "response_preview": text[:100]
                 })
 
+                # Log inference metrics
+                log_inference_metrics(ml_logger, model_name, tokens, int((time.time() - start_time) * 1000))
+
             except Exception as e:
                 logger.error(f"Inference failed: {str(e)}")
                 add_span_attributes(span, {"inference_error": str(e)})
@@ -318,7 +336,7 @@ async def chat(req: ChatRequest):
                 r = await get_cache()
                 cache_ttl = 300  # 5 minutes
                 await r.setex(key, cache_ttl, repr(response_data.model_dump()))
-                logger.info(f"Cached response for prompt: '{req.prompt[:50]}...'")
+                log_cache_operation(ml_logger, "store", key)
                 add_span_attributes(span, {"response_cached": True})
             except Exception as e:
                 logger.warning(f"Failed to cache response: {str(e)}")
@@ -351,6 +369,89 @@ async def batch_stats():
     stats = batcher.get_stats()
     stats.update(get_device_info())
     return stats
+
+# Alert endpoints
+@app.post("/alerts/{component}")
+async def receive_alert(component: str, webhook: AlertmanagerWebhook):
+    """Receive and process alerts from Alertmanager."""
+    try:
+        alert_event = alert_processor.process_webhook(webhook)
+
+        ml_logger.info(
+            f"Alert received for component: {component}",
+            extra={
+                'extra_fields': {
+                    'alert': {
+                        'component': component,
+                        'status': webhook.status,
+                        'alert_count': len(webhook.alerts),
+                        'severity': webhook.commonLabels.get('severity', 'unknown'),
+                        'alertname': webhook.commonLabels.get('alertname', 'unknown')
+                    }
+                }
+            }
+        )
+
+        return {
+            "status": "received",
+            "component": component,
+            "alert_count": len(webhook.alerts),
+            "processed_at": alert_event["timestamp"]
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to process alert for {component}: {str(e)}")
+        return {"status": "error", "message": str(e)}, 500
+
+@app.get("/alerts/summary")
+async def alert_summary():
+    """Get current alert summary."""
+    return alert_processor.get_alert_summary()
+
+@app.get("/alerts/active")
+async def active_alerts():
+    """Get currently active alerts."""
+    active = []
+    for fingerprint, alert in alert_processor.active_alerts.items():
+        active.append({
+            "fingerprint": fingerprint,
+            "alertname": alert.labels.get("alertname"),
+            "component": alert.labels.get("component"),
+            "severity": alert.labels.get("severity"),
+            "summary": alert.annotations.get("summary"),
+            "starts_at": alert.startsAt
+        })
+    return {"active_alerts": active, "count": len(active)}
+
+@app.get("/alerts/history")
+async def alert_history(limit: int = 50):
+    """Get recent alert history."""
+    return {
+        "history": alert_processor.alert_history[-limit:],
+        "total_count": len(alert_processor.alert_history)
+    }
+
+@app.post("/test/simulate-alert/{alert_type}")
+async def simulate_alert(alert_type: str):
+    """Simulate alert conditions for testing (development only)."""
+
+    if os.getenv("ENVIRONMENT", "development") != "development":
+        raise HTTPException(status_code=403, detail="Alert simulation only available in development")
+
+    if alert_type == "gpu-memory":
+        # Artificially report high GPU memory usage
+        GPU_MEMORY_ALLOCATED.set(0.9 * GPU_MEMORY_TOTAL._value.get())
+        return {"status": "simulated", "alert_type": "gpu-memory", "message": "GPU memory usage set to 90%"}
+
+    elif alert_type == "high-latency":
+        # This would normally be handled by the inference system
+        return {"status": "simulated", "alert_type": "high-latency", "message": "Use slow inference requests to trigger"}
+
+    elif alert_type == "service-down":
+        return {"status": "simulated", "alert_type": "service-down", "message": "Stop the service to trigger this alert"}
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown alert type: {alert_type}")
 
 # Add a simple root endpoint
 @app.get("/")
