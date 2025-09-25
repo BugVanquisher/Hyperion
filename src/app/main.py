@@ -10,6 +10,8 @@ from fastapi.responses import PlainTextResponse, JSONResponse
 from .models.llm import generate_text, init_model, health_check, get_device_info
 from .cache import get_cache, cache_key
 from .batching import get_batcher
+from .tracing import instrument_app, trace_operation, add_span_attributes, get_trace_id
+from opentelemetry import trace
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +22,9 @@ app = FastAPI(
     description="Scalable, Observable, and Reliable inference platform for LLMs",
     version="0.1.0"
 )
+
+# Initialize distributed tracing
+instrument_app(app)
 
 # Add CORS middleware for development
 app.add_middleware(
@@ -202,85 +207,130 @@ async def metrics():
 async def chat(req: ChatRequest):
     """
     Generate text using the loaded LLM.
-    
+
     This endpoint supports caching to improve response times and reduce costs.
     """
-    # Check if model is ready
-    if not model_loading_complete:
-        raise HTTPException(
-            status_code=503, 
-            detail="Model is still loading. Please try again in a few moments."
-        )
-    
-    # Try cache first
-    cache_hit = False
-    try:
-        r = await get_cache()
-        key = cache_key("llm:chat", req.model_dump())
-        cached_response = await r.get(key)
-        
-        if cached_response:
-            CACHE_REQUESTS.labels(status="hit").inc()
-            cached_data = eval(cached_response)  # Note: In production, use json.loads
-            cached_data["cached"] = True
-            logger.info(f"Cache hit for prompt: '{req.prompt[:50]}...'")
-            return ChatResponse(**cached_data)
-        else:
-            CACHE_REQUESTS.labels(status="miss").inc()
-    except Exception as e:
-        logger.warning(f"Cache error: {str(e)}. Proceeding without cache.")
-    
-    # Perform inference using batching
-    start_time = time.time()
-    try:
-        batcher = get_batcher()
-        request_id = f"{int(time.time() * 1000)}_{hash(req.prompt) % 10000}"
+    with trace_operation("llm_chat_request", {
+        "prompt_length": len(req.prompt),
+        "max_tokens": req.max_tokens,
+        "temperature": req.temperature,
+        "trace_id": get_trace_id()
+    }) as span:
 
-        with BATCH_WAIT_TIME.time():
-            batch_result = await batcher.add_request(
-                prompt=req.prompt,
-                max_tokens=req.max_tokens,
-                temperature=req.temperature,
-                request_id=request_id
+        # Check if model is ready
+        if not model_loading_complete:
+            span.set_status(trace.Status(trace.StatusCode.ERROR, "Model not loaded"))
+            raise HTTPException(
+                status_code=503,
+                detail="Model is still loading. Please try again in a few moments."
             )
 
-        # Record batch metrics
-        batch_stats = batcher.get_stats()
-        if batch_stats["total_batches"] > 0:
-            avg_batch_size = int(batch_stats["avg_requests_per_batch"])
-            BATCH_REQUESTS.labels(batch_size=str(avg_batch_size)).inc()
+        # Try cache first
+        cache_hit = False
+        with trace_operation("cache_lookup", {"cache_key": cache_key("llm:chat", req.model_dump())[:50]}):
+            try:
+                r = await get_cache()
+                key = cache_key("llm:chat", req.model_dump())
+                cached_response = await r.get(key)
 
-        text = batch_result.response
-        tokens = batch_result.tokens_used
-        model_name = batch_result.model_name
+                if cached_response:
+                    CACHE_REQUESTS.labels(status="hit").inc()
+                    cached_data = eval(cached_response)  # Note: In production, use json.loads
+                    cached_data["cached"] = True
+                    cache_hit = True
 
-    except Exception as e:
-        logger.error(f"Inference failed: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Inference failed: {str(e)}"
+                    add_span_attributes(span, {
+                        "cache_hit": True,
+                        "response_cached": True
+                    })
+
+                    logger.info(f"Cache hit for prompt: '{req.prompt[:50]}...'")
+                    return ChatResponse(**cached_data)
+                else:
+                    CACHE_REQUESTS.labels(status="miss").inc()
+                    add_span_attributes(span, {"cache_hit": False})
+
+            except Exception as e:
+                logger.warning(f"Cache error: {str(e)}. Proceeding without cache.")
+                add_span_attributes(span, {"cache_error": str(e)})
+
+        # Perform inference using batching
+        start_time = time.time()
+        with trace_operation("model_inference", {
+            "request_id": f"{int(time.time() * 1000)}_{hash(req.prompt) % 10000}",
+            "prompt_preview": req.prompt[:100]
+        }):
+            try:
+                batcher = get_batcher()
+                request_id = f"{int(time.time() * 1000)}_{hash(req.prompt) % 10000}"
+
+                with BATCH_WAIT_TIME.time():
+                    batch_result = await batcher.add_request(
+                        prompt=req.prompt,
+                        max_tokens=req.max_tokens,
+                        temperature=req.temperature,
+                        request_id=request_id
+                    )
+
+                # Record batch metrics
+                batch_stats = batcher.get_stats()
+                if batch_stats["total_batches"] > 0:
+                    avg_batch_size = int(batch_stats["avg_requests_per_batch"])
+                    BATCH_REQUESTS.labels(batch_size=str(avg_batch_size)).inc()
+
+                    add_span_attributes(span, {
+                        "batch_size": avg_batch_size,
+                        "total_batches": batch_stats["total_batches"],
+                        "avg_batch_time_ms": batch_stats.get("avg_batch_time_ms", 0)
+                    })
+
+                text = batch_result.response
+                tokens = batch_result.tokens_used
+                model_name = batch_result.model_name
+
+                add_span_attributes(span, {
+                    "model_name": model_name,
+                    "tokens_generated": tokens,
+                    "response_preview": text[:100]
+                })
+
+            except Exception as e:
+                logger.error(f"Inference failed: {str(e)}")
+                add_span_attributes(span, {"inference_error": str(e)})
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Inference failed: {str(e)}"
+                )
+
+        processing_time_ms = int((time.time() - start_time) * 1000)
+
+        response_data = ChatResponse(
+            model=model_name,
+            response=text,
+            tokens_used=tokens,
+            cached=False,
+            processing_time_ms=processing_time_ms
         )
-    
-    processing_time_ms = int((time.time() - start_time) * 1000)
-    
-    response_data = ChatResponse(
-        model=model_name,
-        response=text,
-        tokens_used=tokens,
-        cached=False,
-        processing_time_ms=processing_time_ms
-    )
-    
-    # Cache the response
-    try:
-        r = await get_cache()
-        cache_ttl = 300  # 5 minutes
-        await r.setex(key, cache_ttl, repr(response_data.model_dump()))
-        logger.info(f"Cached response for prompt: '{req.prompt[:50]}...'")
-    except Exception as e:
-        logger.warning(f"Failed to cache response: {str(e)}")
-    
-    return response_data
+
+        # Cache the response
+        with trace_operation("cache_store"):
+            try:
+                r = await get_cache()
+                cache_ttl = 300  # 5 minutes
+                await r.setex(key, cache_ttl, repr(response_data.model_dump()))
+                logger.info(f"Cached response for prompt: '{req.prompt[:50]}...'")
+                add_span_attributes(span, {"response_cached": True})
+            except Exception as e:
+                logger.warning(f"Failed to cache response: {str(e)}")
+                add_span_attributes(span, {"cache_store_error": str(e)})
+
+        # Final span attributes
+        add_span_attributes(span, {
+            "processing_time_ms": processing_time_ms,
+            "success": True
+        })
+
+        return response_data
 
 @app.get("/v1/models")
 async def list_models():

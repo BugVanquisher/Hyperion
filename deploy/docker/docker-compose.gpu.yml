@@ -12,6 +12,8 @@ services:
       - MODEL_NAME=microsoft/DialoGPT-small
       - DEVICE_TYPE=auto
       - BATCH_SIZE=4
+      - OTEL_SERVICE_NAME=hyperion-app-gpu
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
     depends_on:
       redis:
         condition: service_healthy
@@ -82,6 +84,20 @@ services:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: hyperion-jaeger-gpu
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger HTTP collector
+      - "6831:6831/udp"  # Jaeger UDP collector
+      - "6832:6832/udp"  # Jaeger UDP collector
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
     restart: unless-stopped
 
 volumes:
