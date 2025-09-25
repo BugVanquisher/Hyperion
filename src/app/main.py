@@ -14,6 +14,7 @@ from .logging_config import (
     setup_structured_logging, get_ml_logger, log_gpu_metrics,
     log_batch_metrics, log_inference_metrics, log_cache_operation
 )
+from .alerts import AlertmanagerWebhook, alert_processor
 from opentelemetry import trace
 
 # Set up structured logging
@@ -368,6 +369,89 @@ async def batch_stats():
     stats = batcher.get_stats()
     stats.update(get_device_info())
     return stats
+
+# Alert endpoints
+@app.post("/alerts/{component}")
+async def receive_alert(component: str, webhook: AlertmanagerWebhook):
+    """Receive and process alerts from Alertmanager."""
+    try:
+        alert_event = alert_processor.process_webhook(webhook)
+
+        ml_logger.info(
+            f"Alert received for component: {component}",
+            extra={
+                'extra_fields': {
+                    'alert': {
+                        'component': component,
+                        'status': webhook.status,
+                        'alert_count': len(webhook.alerts),
+                        'severity': webhook.commonLabels.get('severity', 'unknown'),
+                        'alertname': webhook.commonLabels.get('alertname', 'unknown')
+                    }
+                }
+            }
+        )
+
+        return {
+            "status": "received",
+            "component": component,
+            "alert_count": len(webhook.alerts),
+            "processed_at": alert_event["timestamp"]
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to process alert for {component}: {str(e)}")
+        return {"status": "error", "message": str(e)}, 500
+
+@app.get("/alerts/summary")
+async def alert_summary():
+    """Get current alert summary."""
+    return alert_processor.get_alert_summary()
+
+@app.get("/alerts/active")
+async def active_alerts():
+    """Get currently active alerts."""
+    active = []
+    for fingerprint, alert in alert_processor.active_alerts.items():
+        active.append({
+            "fingerprint": fingerprint,
+            "alertname": alert.labels.get("alertname"),
+            "component": alert.labels.get("component"),
+            "severity": alert.labels.get("severity"),
+            "summary": alert.annotations.get("summary"),
+            "starts_at": alert.startsAt
+        })
+    return {"active_alerts": active, "count": len(active)}
+
+@app.get("/alerts/history")
+async def alert_history(limit: int = 50):
+    """Get recent alert history."""
+    return {
+        "history": alert_processor.alert_history[-limit:],
+        "total_count": len(alert_processor.alert_history)
+    }
+
+@app.post("/test/simulate-alert/{alert_type}")
+async def simulate_alert(alert_type: str):
+    """Simulate alert conditions for testing (development only)."""
+
+    if os.getenv("ENVIRONMENT", "development") != "development":
+        raise HTTPException(status_code=403, detail="Alert simulation only available in development")
+
+    if alert_type == "gpu-memory":
+        # Artificially report high GPU memory usage
+        GPU_MEMORY_ALLOCATED.set(0.9 * GPU_MEMORY_TOTAL._value.get())
+        return {"status": "simulated", "alert_type": "gpu-memory", "message": "GPU memory usage set to 90%"}
+
+    elif alert_type == "high-latency":
+        # This would normally be handled by the inference system
+        return {"status": "simulated", "alert_type": "high-latency", "message": "Use slow inference requests to trigger"}
+
+    elif alert_type == "service-down":
+        return {"status": "simulated", "alert_type": "service-down", "message": "Stop the service to trigger this alert"}
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown alert type: {alert_type}")
 
 # Add a simple root endpoint
 @app.get("/")

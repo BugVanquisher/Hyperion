@@ -284,6 +284,11 @@ show_status() {
             echo "  • Kibana: http://localhost:5601"
             echo "  • Elasticsearch: http://localhost:9200"
         fi
+
+        # Check if Alertmanager is running
+        if docker-compose ps | grep -q "alertmanager"; then
+            echo "  • Alertmanager: http://localhost:9093"
+        fi
         echo ""
         echo "To view logs: ./setup.sh logs"
         echo "To run tests: ./setup.sh test"

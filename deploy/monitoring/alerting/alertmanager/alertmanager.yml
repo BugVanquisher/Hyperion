@@ -1,0 +1,138 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'hyperion-alerts@example.com'
+  smtp_auth_username: 'hyperion-alerts@example.com'
+  smtp_auth_password: 'password'
+
+# The directory from which notification templates are read.
+templates:
+- '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+  # GPU-related alerts - high priority
+  - match:
+      severity: critical
+      component: gpu
+    receiver: gpu-critical
+    group_wait: 5s
+    repeat_interval: 30m
+
+  # ML inference alerts - medium priority
+  - match:
+      severity: warning
+      component: ml-inference
+    receiver: ml-inference-alerts
+    group_wait: 30s
+    repeat_interval: 2h
+
+  # Batch processing alerts
+  - match:
+      component: batch-processing
+    receiver: batch-alerts
+    group_wait: 1m
+    repeat_interval: 4h
+
+  # Cache performance alerts
+  - match:
+      component: cache
+    receiver: cache-alerts
+    group_wait: 1m
+    repeat_interval: 2h
+
+receivers:
+- name: 'web.hook'
+  webhook_configs:
+  - url: 'http://127.0.0.1:5001/'
+
+- name: 'gpu-critical'
+  webhook_configs:
+  - url: 'http://hyperion-app:8000/alerts/gpu-critical'
+    send_resolved: true
+    title: 'GPU Critical Alert - {{ .GroupLabels.alertname }}'
+    text: |
+      {{ range .Alerts }}
+      Alert: {{ .Annotations.summary }}
+      Description: {{ .Annotations.description }}
+      GPU: {{ .Labels.gpu_name }}
+      Memory: {{ .Labels.gpu_memory_usage }}%
+      {{ end }}
+
+  # Slack integration (configure with your webhook URL)
+  slack_configs:
+  - api_url: '${SLACK_WEBHOOK_URL}'
+    channel: '#hyperion-alerts'
+    title: 'GPU CRITICAL: {{ .GroupLabels.alertname }}'
+    text: |
+      🚨 *Critical GPU Alert* 🚨
+      {{ range .Alerts }}
+      *Alert:* {{ .Annotations.summary }}
+      *GPU:* {{ .Labels.gpu_name | default "Unknown" }}
+      *Memory Usage:* {{ .Labels.gpu_memory_usage | default "N/A" }}%
+      *Time:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+      {{ end }}
+    send_resolved: true
+
+- name: 'ml-inference-alerts'
+  webhook_configs:
+  - url: 'http://hyperion-app:8000/alerts/ml-inference'
+    send_resolved: true
+
+  slack_configs:
+  - api_url: '${SLACK_WEBHOOK_URL}'
+    channel: '#hyperion-alerts'
+    title: 'ML Inference Alert: {{ .GroupLabels.alertname }}'
+    text: |
+      ⚠️ *ML Inference Alert* ⚠️
+      {{ range .Alerts }}
+      *Alert:* {{ .Annotations.summary }}
+      *Model:* {{ .Labels.model_name | default "Unknown" }}
+      *Inference Time:* {{ .Labels.inference_time | default "N/A" }}ms
+      *Batch Size:* {{ .Labels.batch_size | default "N/A" }}
+      {{ end }}
+    send_resolved: true
+
+- name: 'batch-alerts'
+  webhook_configs:
+  - url: 'http://hyperion-app:8000/alerts/batch-processing'
+    send_resolved: true
+
+  slack_configs:
+  - api_url: '${SLACK_WEBHOOK_URL}'
+    channel: '#hyperion-performance'
+    title: 'Batch Processing Alert: {{ .GroupLabels.alertname }}'
+    text: |
+      📊 *Batch Processing Alert*
+      {{ range .Alerts }}
+      *Alert:* {{ .Annotations.summary }}
+      *Avg Batch Size:* {{ .Labels.avg_batch_size | default "N/A" }}
+      *Processing Time:* {{ .Labels.batch_duration | default "N/A" }}s
+      {{ end }}
+
+- name: 'cache-alerts'
+  webhook_configs:
+  - url: 'http://hyperion-app:8000/alerts/cache-performance'
+    send_resolved: true
+
+  slack_configs:
+  - api_url: '${SLACK_WEBHOOK_URL}'
+    channel: '#hyperion-performance'
+    title: 'Cache Performance Alert: {{ .GroupLabels.alertname }}'
+    text: |
+      💾 *Cache Performance Alert*
+      {{ range .Alerts }}
+      *Alert:* {{ .Annotations.summary }}
+      *Hit Rate:* {{ .Labels.cache_hit_rate | default "N/A" }}%
+      {{ end }}
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
