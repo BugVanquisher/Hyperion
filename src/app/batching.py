@@ -12,6 +12,20 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
+# Import tracing utilities
+try:
+    from .tracing import trace_operation, add_span_attributes
+except ImportError:
+    # Fallback if tracing is not available
+    from contextlib import contextmanager
+
+    @contextmanager
+    def trace_operation(name, attributes=None):
+        yield None
+
+    def add_span_attributes(span, attributes):
+        pass
+
 
 @dataclass
 class BatchRequest:
@@ -145,28 +159,45 @@ class RequestBatcher:
             batch = self.pending_requests.copy()
             self.pending_requests.clear()
 
-        logger.info(f"Processing batch of {len(batch)} requests")
-        batch_start_time = time.time()
+        with trace_operation("batch_processing", {
+            "batch_size": len(batch),
+            "request_ids": [req.request_id for req in batch[:5]]  # First 5 IDs
+        }) as span:
+            logger.info(f"Processing batch of {len(batch)} requests")
+            batch_start_time = time.time()
 
-        try:
-            # Group requests by similar parameters for optimal batching
-            grouped_requests = self._group_similar_requests(batch)
+            try:
+                # Group requests by similar parameters for optimal batching
+                grouped_requests = self._group_similar_requests(batch)
+                add_span_attributes(span, {"num_groups": len(grouped_requests)})
 
-            # Process each group
-            for group in grouped_requests:
-                await self._process_request_group(group)
+                # Process each group
+                for group_idx, group in enumerate(grouped_requests):
+                    with trace_operation(f"batch_group_{group_idx}", {
+                        "group_size": len(group),
+                        "group_max_tokens": group[0].max_tokens if group else 0
+                    }):
+                        await self._process_request_group(group)
 
-        except Exception as e:
-            logger.error(f"Batch processing failed: {e}")
-            # Set error for all requests in batch
-            for request in batch:
-                if not request.future.done():
-                    request.future.set_exception(e)
+                add_span_attributes(span, {"success": True})
 
-        finally:
-            batch_time = time.time() - batch_start_time
-            self.total_batches += 1
-            self.total_batch_time += batch_time
+            except Exception as e:
+                logger.error(f"Batch processing failed: {e}")
+                add_span_attributes(span, {"error": str(e), "success": False})
+                # Set error for all requests in batch
+                for request in batch:
+                    if not request.future.done():
+                        request.future.set_exception(e)
+
+            finally:
+                batch_time = time.time() - batch_start_time
+                self.total_batches += 1
+                self.total_batch_time += batch_time
+
+                add_span_attributes(span, {
+                    "batch_processing_time_ms": int(batch_time * 1000),
+                    "total_batches_processed": self.total_batches
+                })
 
             logger.info(f"Batch completed in {batch_time:.3f}s, "
                        f"avg_batch_time={self.total_batch_time/self.total_batches:.3f}s")

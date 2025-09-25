@@ -272,6 +272,7 @@ show_status() {
         echo "  • Metrics: http://localhost:8000/metrics"
         echo "  • Grafana: http://localhost:3000 (admin/admin)"
         echo "  • Prometheus: http://localhost:9090"
+        echo "  • Jaeger UI: http://localhost:16686"
         echo "  • Redis: localhost:6379"
         echo ""
         echo "To view logs: ./setup.sh logs"
