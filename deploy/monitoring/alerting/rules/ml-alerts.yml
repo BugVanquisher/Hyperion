@@ -1,0 +1,239 @@
+groups:
+# GPU Alerting Rules
+- name: gpu-alerts
+  rules:
+  - alert: GPUMemoryHigh
+    expr: (gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+      component: gpu
+      service: hyperion-app
+    annotations:
+      summary: "GPU memory usage is high"
+      description: "GPU memory usage is {{ $value }}% on {{ $labels.instance }}"
+      runbook_url: "https://docs.hyperion.com/runbooks/gpu-memory-high"
+
+  - alert: GPUMemoryCritical
+    expr: (gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100 > 95
+    for: 2m
+    labels:
+      severity: critical
+      component: gpu
+      service: hyperion-app
+    annotations:
+      summary: "GPU memory usage critical"
+      description: "GPU memory usage is {{ $value }}% on {{ $labels.instance }}. Immediate action required."
+      runbook_url: "https://docs.hyperion.com/runbooks/gpu-memory-critical"
+
+  - alert: GPUMemoryLeak
+    expr: increase(gpu_memory_allocated_bytes[1h]) > 1e9 and (gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100 > 70
+    for: 30m
+    labels:
+      severity: warning
+      component: gpu
+      service: hyperion-app
+    annotations:
+      summary: "Potential GPU memory leak detected"
+      description: "GPU memory has increased by {{ $value | humanizeBytes }} in the last hour and is currently at {{ printf \"%.1f\" ((gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100) }}%"
+
+# Model Inference Alerting Rules
+- name: inference-alerts
+  rules:
+  - alert: HighInferenceLatency
+    expr: histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m])) > 2.0
+    for: 10m
+    labels:
+      severity: warning
+      component: ml-inference
+      service: hyperion-app
+    annotations:
+      summary: "High model inference latency"
+      description: "95th percentile inference latency is {{ $value }}s for model {{ $labels.model_name }}"
+
+  - alert: InferenceLatencySpike
+    expr: histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m])) > 5.0
+    for: 5m
+    labels:
+      severity: critical
+      component: ml-inference
+      service: hyperion-app
+    annotations:
+      summary: "Critical inference latency spike"
+      description: "95th percentile inference latency spiked to {{ $value }}s for model {{ $labels.model_name }}"
+
+  - alert: ModelInferenceFailureRate
+    expr: (rate(http_requests_total{path="/v1/llm/chat",status="500"}[5m]) / rate(http_requests_total{path="/v1/llm/chat"}[5m])) * 100 > 5
+    for: 10m
+    labels:
+      severity: warning
+      component: ml-inference
+      service: hyperion-app
+    annotations:
+      summary: "High model inference failure rate"
+      description: "Model inference failure rate is {{ $value }}% over the last 5 minutes"
+
+  - alert: ModelInferenceDown
+    expr: absent(rate(model_inference_duration_seconds_count[5m])) or rate(model_inference_duration_seconds_count[5m]) == 0
+    for: 2m
+    labels:
+      severity: critical
+      component: ml-inference
+      service: hyperion-app
+    annotations:
+      summary: "Model inference not responding"
+      description: "No model inference requests processed in the last 5 minutes"
+
+# Batch Processing Alerting Rules
+- name: batch-processing-alerts
+  rules:
+  - alert: BatchProcessingSlow
+    expr: histogram_quantile(0.95, rate(batch_wait_time_seconds_bucket[10m])) > 1.0
+    for: 15m
+    labels:
+      severity: warning
+      component: batch-processing
+      service: hyperion-app
+    annotations:
+      summary: "Batch processing is slow"
+      description: "95th percentile batch wait time is {{ $value }}s, indicating slow batch processing"
+
+  - alert: BatchSizeAnomalyLow
+    expr: avg_over_time(batch_requests_total[1h]) < 1 and rate(http_requests_total{path="/v1/llm/chat"}[5m]) > 0.1
+    for: 20m
+    labels:
+      severity: warning
+      component: batch-processing
+      service: hyperion-app
+    annotations:
+      summary: "Batch size unexpectedly low"
+      description: "Average batch size is {{ $value }} despite active inference requests. Batching may be degraded."
+
+  - alert: BatchProcessingStalled
+    expr: absent(rate(batch_requests_total[5m])) and rate(http_requests_total{path="/v1/llm/chat"}[5m]) > 0
+    for: 5m
+    labels:
+      severity: critical
+      component: batch-processing
+      service: hyperion-app
+    annotations:
+      summary: "Batch processing appears stalled"
+      description: "No batches processed despite active inference requests"
+
+# Cache Performance Alerting Rules
+- name: cache-alerts
+  rules:
+  - alert: CacheHitRateLow
+    expr: (rate(cache_requests_total{status="hit"}[10m]) / rate(cache_requests_total[10m])) * 100 < 20
+    for: 15m
+    labels:
+      severity: warning
+      component: cache
+      service: hyperion-app
+    annotations:
+      summary: "Cache hit rate is low"
+      description: "Cache hit rate is {{ $value }}% over the last 10 minutes"
+
+  - alert: CacheDown
+    expr: absent(rate(cache_requests_total[5m])) and rate(http_requests_total{path="/v1/llm/chat"}[5m]) > 0
+    for: 5m
+    labels:
+      severity: critical
+      component: cache
+      service: hyperion-app
+    annotations:
+      summary: "Cache appears to be down"
+      description: "No cache requests detected despite active API traffic"
+
+# System Health Alerting Rules
+- name: system-health-alerts
+  rules:
+  - alert: HighRequestLatency
+    expr: histogram_quantile(0.95, rate(http_request_latency_seconds_bucket{path="/v1/llm/chat"}[5m])) > 10.0
+    for: 10m
+    labels:
+      severity: warning
+      component: api
+      service: hyperion-app
+    annotations:
+      summary: "High API request latency"
+      description: "95th percentile request latency is {{ $value }}s for API endpoint {{ $labels.path }}"
+
+  - alert: HighErrorRate
+    expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) * 100 > 10
+    for: 5m
+    labels:
+      severity: critical
+      component: api
+      service: hyperion-app
+    annotations:
+      summary: "High API error rate"
+      description: "API error rate is {{ $value }}% over the last 5 minutes"
+
+  - alert: ServiceDown
+    expr: up{job="hyperion-app"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: api
+      service: hyperion-app
+    annotations:
+      summary: "Hyperion service is down"
+      description: "Hyperion service has been down for more than 1 minute"
+
+# Anomaly Detection Rules (Statistical)
+- name: anomaly-detection
+  rules:
+  # GPU memory usage deviation from normal pattern
+  - alert: GPUMemoryAnomalyHigh
+    expr: |
+      (
+        gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100
+        -
+        avg_over_time(gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100[1h] offset 1d)
+      ) > (2 * stddev_over_time(gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100[1h] offset 1d))
+    for: 10m
+    labels:
+      severity: warning
+      component: gpu
+      service: hyperion-app
+      anomaly: memory-usage
+    annotations:
+      summary: "GPU memory usage anomaly detected"
+      description: "GPU memory usage ({{ $value }}%) is significantly higher than historical pattern"
+
+  # Inference latency anomaly detection
+  - alert: InferenceLatencyAnomaly
+    expr: |
+      (
+        histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))
+        -
+        avg_over_time(histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))[1h] offset 1d)
+      ) > (2 * stddev_over_time(histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))[1h] offset 1d))
+    for: 15m
+    labels:
+      severity: warning
+      component: ml-inference
+      service: hyperion-app
+      anomaly: latency
+    annotations:
+      summary: "Inference latency anomaly detected"
+      description: "Current inference latency ({{ $value }}s) deviates significantly from historical pattern"
+
+  # Request rate anomaly (sudden drop might indicate issues)
+  - alert: RequestRateAnomalyLow
+    expr: |
+      (
+        avg_over_time(rate(http_requests_total{path="/v1/llm/chat"}[5m])[1h] offset 1d)
+        -
+        rate(http_requests_total{path="/v1/llm/chat"}[5m])
+      ) > (2 * stddev_over_time(rate(http_requests_total{path="/v1/llm/chat"}[5m])[1h] offset 1d))
+    for: 20m
+    labels:
+      severity: warning
+      component: api
+      service: hyperion-app
+      anomaly: request-rate-low
+    annotations:
+      summary: "Unusually low request rate detected"
+      description: "Current request rate is significantly lower than historical pattern, possible service degradation"

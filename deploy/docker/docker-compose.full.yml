@@ -1,0 +1,226 @@
+services:
+  app:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile
+    image: hyperion:local
+    container_name: hyperion-app
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MODEL_NAME=microsoft/DialoGPT-small
+      - OTEL_SERVICE_NAME=hyperion-app
+      - OTEL_EXPORTER_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+      - ENABLE_JSON_LOGS=true
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "log_group=hyperion-ml"
+
+  redis:
+    image: redis:7-alpine
+    container_name: hyperion-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-cache"
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: hyperion-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../monitoring/alerting/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    depends_on:
+      - app
+      - alertmanager
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-monitoring"
+
+  # Alertmanager for alert processing
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: hyperion-alertmanager
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.listen-address='
+    volumes:
+      - ../monitoring/alerting/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-alerting"
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: hyperion-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ../monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ../monitoring/grafana/dashboard-config.yml:/etc/grafana/provisioning/dashboards/dashboard-config.yml
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-monitoring"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: hyperion-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-tracing"
+
+  # ELK Stack
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: hyperion-elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=hyperion-logs
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-logging"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: hyperion-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - SERVER_NAME=hyperion-kibana
+      - XPACK_SECURITY_ENABLED=false
+    volumes:
+      - ../monitoring/elk/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-logging"
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: hyperion-logstash
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    environment:
+      - "LS_JAVA_OPTS=-Xmx1g -Xms1g"
+    volumes:
+      - ../monitoring/elk/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ../monitoring/elk/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-logging"
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: hyperion-filebeat
+    user: root
+    volumes:
+      - ../monitoring/elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      logstash:
+        condition: service_started
+    restart: unless-stopped
+    labels:
+      - "log_group=hyperion-logging"
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+  alertmanager_data:
+
+networks:
+  default:
+    name: hyperion-full

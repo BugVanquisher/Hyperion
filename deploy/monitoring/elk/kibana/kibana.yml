@@ -1,0 +1,7 @@
+server.host: "0.0.0.0"
+server.shutdownTimeout: "5s"
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+monitoring.ui.container.elasticsearch.enabled: true
+server.name: hyperion-kibana
+xpack.security.enabled: false
+xpack.encryptedSavedObjects.encryptionKey: "hyperion-kibana-encryption-key-32-chars-long"
