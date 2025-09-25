@@ -64,9 +64,13 @@ print_status "All prerequisites met!"
 # Function to build and start services
 start_services() {
     local use_gpu=${1:-false}
+    local use_full=${2:-false}
     echo ""
 
-    if [ "$use_gpu" = "true" ]; then
+    if [ "$use_full" = "true" ]; then
+        echo "🚀 Building and starting all services with ELK stack..."
+        COMPOSE_FILE="docker-compose.full.yml"
+    elif [ "$use_gpu" = "true" ]; then
         echo "🚀 Building and starting GPU-enabled services..."
         COMPOSE_FILE="docker-compose.gpu.yml"
     else
@@ -274,6 +278,12 @@ show_status() {
         echo "  • Prometheus: http://localhost:9090"
         echo "  • Jaeger UI: http://localhost:16686"
         echo "  • Redis: localhost:6379"
+
+        # Check if ELK services are running
+        if docker-compose ps | grep -q "elasticsearch\|kibana"; then
+            echo "  • Kibana: http://localhost:5601"
+            echo "  • Elasticsearch: http://localhost:9200"
+        fi
         echo ""
         echo "To view logs: ./setup.sh logs"
         echo "To run tests: ./setup.sh test"
@@ -296,9 +306,11 @@ show_help() {
     echo "Commands:"
     echo "  start       - Build and start all services (CPU)"
     echo "  start-gpu   - Build and start GPU-enabled services"
+    echo "  start-full  - Build and start all services with ELK stack"
     echo "  stop        - Stop all services"
     echo "  restart     - Restart all services (CPU)"
     echo "  restart-gpu - Restart GPU-enabled services"
+    echo "  restart-full - Restart all services with ELK stack"
     echo "  test        - Run API tests"
     echo "  logs        - Show service logs"
     echo "  status      - Show service status"
@@ -315,7 +327,7 @@ show_help() {
 # Main script logic
 case "${1:-start}" in
     "start")
-        start_services false
+        start_services false false
         show_status
         ;;
     "start-gpu")
@@ -324,7 +336,13 @@ case "${1:-start}" in
             print_warning "NVIDIA Docker runtime not detected. GPU features may not work."
             echo "Install nvidia-container-toolkit for full GPU support."
         fi
-        start_services true
+        start_services true false
+        show_status
+        ;;
+    "start-full")
+        echo "🚀 Starting full observability stack (this may take several minutes)..."
+        print_warning "This will start Elasticsearch, Logstash, and Kibana. Requires at least 4GB RAM."
+        start_services false true
         show_status
         ;;
     "stop")
@@ -332,12 +350,17 @@ case "${1:-start}" in
         ;;
     "restart")
         stop_services
-        start_services false
+        start_services false false
         show_status
         ;;
     "restart-gpu")
         stop_services
-        start_services true
+        start_services true false
+        show_status
+        ;;
+    "restart-full")
+        stop_services
+        start_services false true
         show_status
         ;;
     "test")

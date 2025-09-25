@@ -4,18 +4,28 @@ from pydantic import BaseModel, Field
 from typing import Optional
 import os
 import time
-import logging
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import PlainTextResponse, JSONResponse
 from .models.llm import generate_text, init_model, health_check, get_device_info
 from .cache import get_cache, cache_key
 from .batching import get_batcher
 from .tracing import instrument_app, trace_operation, add_span_attributes, get_trace_id
+from .logging_config import (
+    setup_structured_logging, get_ml_logger, log_gpu_metrics,
+    log_batch_metrics, log_inference_metrics, log_cache_operation
+)
 from opentelemetry import trace
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Set up structured logging
+enable_json_logging = os.getenv("ENABLE_JSON_LOGS", "true").lower() == "true"
+logger = setup_structured_logging(
+    service_name="hyperion-app",
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    enable_json=enable_json_logging
+)
+
+# Get ML-aware logger
+ml_logger = get_ml_logger("hyperion.ml", service="hyperion-app")
 
 app = FastAPI(
     title="Hyperion - ML Inference Platform",
@@ -179,6 +189,9 @@ def update_gpu_metrics():
             GPU_MEMORY_ALLOCATED.set(allocated_gb * 1e9)
             GPU_MEMORY_TOTAL.set(total_gb * 1e9)
 
+            # Log GPU metrics in structured format
+            log_gpu_metrics(ml_logger, device_info)
+
         # Update optimization metrics
         if 'optimizations' in device_info:
             opts = device_info['optimizations']
@@ -244,11 +257,12 @@ async def chat(req: ChatRequest):
                         "response_cached": True
                     })
 
-                    logger.info(f"Cache hit for prompt: '{req.prompt[:50]}...'")
+                    log_cache_operation(ml_logger, "lookup", key, hit=True)
                     return ChatResponse(**cached_data)
                 else:
                     CACHE_REQUESTS.labels(status="miss").inc()
                     add_span_attributes(span, {"cache_hit": False})
+                    log_cache_operation(ml_logger, "lookup", key, hit=False)
 
             except Exception as e:
                 logger.warning(f"Cache error: {str(e)}. Proceeding without cache.")
@@ -294,6 +308,9 @@ async def chat(req: ChatRequest):
                     "response_preview": text[:100]
                 })
 
+                # Log inference metrics
+                log_inference_metrics(ml_logger, model_name, tokens, int((time.time() - start_time) * 1000))
+
             except Exception as e:
                 logger.error(f"Inference failed: {str(e)}")
                 add_span_attributes(span, {"inference_error": str(e)})
@@ -318,7 +335,7 @@ async def chat(req: ChatRequest):
                 r = await get_cache()
                 cache_ttl = 300  # 5 minutes
                 await r.setex(key, cache_ttl, repr(response_data.model_dump()))
-                logger.info(f"Cached response for prompt: '{req.prompt[:50]}...'")
+                log_cache_operation(ml_logger, "store", key)
                 add_span_attributes(span, {"response_cached": True})
             except Exception as e:
                 logger.warning(f"Failed to cache response: {str(e)}")
