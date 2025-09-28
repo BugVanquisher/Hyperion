@@ -15,8 +15,23 @@ install:
 test:
 	pytest tests/ -v
 
+test-fast:
+	pytest tests/ -v -m "not slow and not integration and not load"
+
+test-integration:
+	pytest tests/ -v -m "integration"
+
+test-performance:
+	pytest tests/ -v -m "performance"
+
+test-load:
+	pytest tests/ -v -m "load"
+
 test-cov:
 	pytest tests/ --cov=src --cov-report=term-missing --cov-report=html
+
+test-cov-fast:
+	pytest tests/ -m "not slow and not integration and not load" --cov=src --cov-report=term-missing
 
 lint:
 	flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
