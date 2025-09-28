@@ -60,9 +60,7 @@ class TestRequestBatcher:
     @pytest.fixture
     def batcher(self):
         """Create a RequestBatcher instance."""
-        return RequestBatcher(
-            max_batch_size=3, max_wait_time=0.1, enable_batching=True
-        )
+        return RequestBatcher(max_batch_size=3, max_wait_time=0.1, enable_batching=True)
 
     def test_batcher_initialization(self, batcher):
         """Test RequestBatcher initialization."""
@@ -157,7 +155,8 @@ class TestBatcherSingleton:
         assert batcher1 is batcher2
 
     @patch.dict(
-        os.environ, {"BATCH_SIZE": "5", "BATCH_WAIT_TIME": "0.2", "ENABLE_BATCHING": "false"}
+        os.environ,
+        {"BATCH_SIZE": "5", "BATCH_WAIT_TIME": "0.2", "ENABLE_BATCHING": "false"},
     )
     def test_get_batcher_with_env_config(self):
         """Test get_batcher respects environment configuration."""
@@ -217,6 +216,7 @@ class TestBatchingPerformance:
     @patch("app.models.llm.generate_text")
     async def test_batching_throughput(self, mock_generate):
         """Test batching throughput."""
+
         # Mock with small delay to simulate processing
         async def mock_generate_with_delay(prompt, tokens, temp):
             await asyncio.sleep(0.01)  # 10ms delay

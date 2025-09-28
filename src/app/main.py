@@ -6,20 +6,28 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from opentelemetry import trace
-from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Gauge, Histogram,
-                               generate_latest)
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 from pydantic import BaseModel, Field
 
 from .alerts import AlertmanagerWebhook, alert_processor
 from .batching import get_batcher
 from .cache import cache_key, get_cache
-from .logging_config import (get_ml_logger, log_batch_metrics,
-                             log_cache_operation, log_gpu_metrics,
-                             log_inference_metrics, setup_structured_logging)
-from .models.llm import (generate_text, get_device_info, health_check,
-                         init_model)
-from .tracing import (add_span_attributes, get_trace_id, instrument_app,
-                      trace_operation)
+from .logging_config import (
+    get_ml_logger,
+    log_batch_metrics,
+    log_cache_operation,
+    log_gpu_metrics,
+    log_inference_metrics,
+    setup_structured_logging,
+)
+from .models.llm import generate_text, get_device_info, health_check, init_model
+from .tracing import add_span_attributes, get_trace_id, instrument_app, trace_operation
 
 # Set up structured logging
 enable_json_logging = os.getenv("ENABLE_JSON_LOGS", "true").lower() == "true"

@@ -109,9 +109,11 @@ class TestTextGeneration:
     @pytest.fixture
     def mock_model_loaded(self):
         """Fixture to mock a loaded model."""
-        with patch("app.models.llm.model") as mock_model, patch(
-            "app.models.llm.tokenizer"
-        ) as mock_tokenizer, patch("app.models.llm.device", torch.device("cpu")):
+        with (
+            patch("app.models.llm.model") as mock_model,
+            patch("app.models.llm.tokenizer") as mock_tokenizer,
+            patch("app.models.llm.device", torch.device("cpu")),
+        ):
 
             # Setup tokenizer mock
             mock_tokenizer.encode.return_value = [1, 2, 3]

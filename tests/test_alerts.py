@@ -15,11 +15,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from app.alerts import (
     AlertComponent,
+    AlertmanagerAlert,
+    AlertmanagerWebhook,
     AlertProcessor,
     AlertSeverity,
     AlertStatus,
-    AlertmanagerAlert,
-    AlertmanagerWebhook,
     alert_processor,
 )
 from app.main import app

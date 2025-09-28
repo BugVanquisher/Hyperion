@@ -64,7 +64,9 @@ class TestEnvironmentConfiguration:
             # Test defaults by importing fresh module components
             assert os.getenv("LOG_LEVEL", "INFO") == "INFO"
             assert os.getenv("ENABLE_JSON_LOGS", "true") == "true"
-            assert os.getenv("REDIS_URL", "redis://redis:6379/0") == "redis://redis:6379/0"
+            assert (
+                os.getenv("REDIS_URL", "redis://redis:6379/0") == "redis://redis:6379/0"
+            )
 
 
 class TestConfigurationValidation:
