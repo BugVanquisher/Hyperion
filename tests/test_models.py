@@ -132,7 +132,9 @@ class TestTextGeneration:
 
             yield mock_model, mock_tokenizer
 
-    @pytest.mark.xfail(reason="generate_text signature mismatch - function returns tuple not dict")
+    @pytest.mark.xfail(
+        reason="generate_text signature mismatch - function returns tuple not dict"
+    )
     def test_generate_text_no_model(self):
         """Test text generation when model is not loaded."""
         result = generate_text("Hello", max_tokens=10, temperature=0.7)
@@ -140,7 +142,9 @@ class TestTextGeneration:
         assert result["error"] == "Model not loaded"
         assert result["response"] == ""
 
-    @pytest.mark.xfail(reason="generate_text signature mismatch - function returns tuple not dict")
+    @pytest.mark.xfail(
+        reason="generate_text signature mismatch - function returns tuple not dict"
+    )
     def test_generate_text_success(self, mock_model_loaded):
         """Test successful text generation."""
         mock_model, mock_tokenizer = mock_model_loaded
@@ -159,7 +163,9 @@ class TestTextGeneration:
         # Verify model generate call
         mock_model.generate.assert_called()
 
-    @pytest.mark.xfail(reason="generate_text signature mismatch - function returns tuple not dict")
+    @pytest.mark.xfail(
+        reason="generate_text signature mismatch - function returns tuple not dict"
+    )
     def test_generate_text_with_different_params(self, mock_model_loaded):
         """Test text generation with different parameters."""
         mock_model, mock_tokenizer = mock_model_loaded
@@ -172,7 +178,9 @@ class TestTextGeneration:
         assert call_args["max_new_tokens"] == 50
         assert abs(call_args["temperature"] - 0.9) < 0.01
 
-    @pytest.mark.xfail(reason="generate_text signature mismatch - function returns tuple not dict")
+    @pytest.mark.xfail(
+        reason="generate_text signature mismatch - function returns tuple not dict"
+    )
     def test_generate_text_exception_handling(self, mock_model_loaded):
         """Test exception handling during text generation."""
         mock_model, mock_tokenizer = mock_model_loaded
@@ -217,7 +225,9 @@ class TestModelIntegration:
 class TestModelPerformance:
     """Performance tests for model operations."""
 
-    @pytest.mark.xfail(reason="generate_text signature mismatch - function returns tuple not dict")
+    @pytest.mark.xfail(
+        reason="generate_text signature mismatch - function returns tuple not dict"
+    )
     @patch("app.models.llm.model", Mock())
     @patch("app.models.llm.tokenizer", Mock())
     @patch("app.models.llm.device", torch.device("cpu"))

@@ -202,7 +202,9 @@ class TestAsyncPerformance:
         async with session.get(url) as response:
             return response.status
 
-    @pytest.mark.xfail(reason="Test server not running during CI - requires live server")
+    @pytest.mark.xfail(
+        reason="Test server not running during CI - requires live server"
+    )
     async def test_async_concurrent_requests(self):
         """Test async concurrent request handling."""
         import aiohttp
