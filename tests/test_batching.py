@@ -5,7 +5,7 @@ Simplified tests for batching functionality.
 import asyncio
 import os
 import sys
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 

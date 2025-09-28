@@ -5,7 +5,7 @@ Tests for caching functionality.
 import asyncio
 import os
 import sys
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

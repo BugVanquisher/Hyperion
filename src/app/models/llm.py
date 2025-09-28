@@ -182,7 +182,6 @@ async def generate_text(prompt: str, max_tokens: int, temperature: float):
 
 async def health_check():
     """Check if the model and tokenizer are properly loaded."""
-    global model, tokenizer
     return model is not None and tokenizer is not None
 
 

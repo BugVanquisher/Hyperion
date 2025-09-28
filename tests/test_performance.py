@@ -168,7 +168,6 @@ class TestLoadTests:
     def test_burst_load(self):
         """Test handling burst of requests."""
         num_requests = 50
-        errors = 0
 
         def make_request():
             try:
@@ -200,8 +199,6 @@ class TestAsyncPerformance:
 
     async def make_async_request(self, session, url):
         """Make an async HTTP request."""
-        import aiohttp
-
         async with session.get(url) as response:
             return response.status
 
