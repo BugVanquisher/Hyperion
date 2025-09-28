@@ -4,6 +4,10 @@
 ![Tests](https://img.shields.io/badge/tests-119%20tests-green)
 ![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)
 
+<p align="center">
+  <img src="images/main_logo.png" alt="Hyperion main logo" width="300">
+</p>
+
 # Hyperion
 **High-Performance, GPU-Accelerated ML Inference Platform** for **production-scale LLM deployment** on **Kubernetes**.
 Built with **Python + FastAPI**, featuring **GPU optimization**, **intelligent batching**, **advanced autoscaling**, and **enterprise-ready observability**.
