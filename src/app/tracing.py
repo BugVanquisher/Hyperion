@@ -5,26 +5,27 @@ This module sets up distributed tracing with Jaeger backend for end-to-end
 request tracking across model inference, batching, and cache operations.
 """
 
-import os
 import logging
+import os
 from contextlib import contextmanager
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 # OpenTelemetry imports
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 logger = logging.getLogger(__name__)
 
 # Global tracer instance
 tracer = None
 _initialized = False
+
 
 def init_tracing():
     """Initialize OpenTelemetry tracing with Jaeger exporter."""
@@ -37,14 +38,18 @@ def init_tracing():
     try:
         # Service configuration
         service_name = os.getenv("OTEL_SERVICE_NAME", "hyperion-app")
-        jaeger_endpoint = os.getenv("OTEL_EXPORTER_JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
+        jaeger_endpoint = os.getenv(
+            "OTEL_EXPORTER_JAEGER_ENDPOINT", "http://localhost:14268/api/traces"
+        )
 
         # Create resource with service information
-        resource = Resource.create({
-            "service.name": service_name,
-            "service.version": "1.0.0",
-            "deployment.environment": os.getenv("ENVIRONMENT", "development"),
-        })
+        resource = Resource.create(
+            {
+                "service.name": service_name,
+                "service.version": "1.0.0",
+                "deployment.environment": os.getenv("ENVIRONMENT", "development"),
+            }
+        )
 
         # Set up tracer provider
         trace.set_tracer_provider(TracerProvider(resource=resource))
@@ -74,6 +79,7 @@ def init_tracing():
         tracer = trace.NoOpTracer()
         return tracer
 
+
 def instrument_app(app):
     """Instrument FastAPI application with OpenTelemetry."""
     try:
@@ -93,6 +99,7 @@ def instrument_app(app):
 
     except Exception as e:
         logger.error(f"Failed to instrument application: {str(e)}")
+
 
 @contextmanager
 def trace_operation(name: str, attributes: Optional[Dict[str, Any]] = None):
@@ -121,22 +128,26 @@ def trace_operation(name: str, attributes: Optional[Dict[str, Any]] = None):
             span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
             raise
 
+
 def add_span_attributes(span, attributes: Dict[str, Any]):
     """Add attributes to the current span."""
     if span and span.is_recording():
         for key, value in attributes.items():
             span.set_attribute(key, value)
 
+
 def get_current_span():
     """Get the current active span."""
     return trace.get_current_span()
+
 
 def get_trace_id():
     """Get the current trace ID as a string."""
     current_span = get_current_span()
     if current_span and current_span.is_recording():
-        return format(current_span.get_span_context().trace_id, '032x')
+        return format(current_span.get_span_context().trace_id, "032x")
     return None
+
 
 def add_event(name: str, attributes: Optional[Dict[str, Any]] = None):
     """Add an event to the current span."""

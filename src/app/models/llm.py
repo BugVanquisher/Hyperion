@@ -1,9 +1,10 @@
 # Example implementation with HuggingFace
-import os
 import asyncio
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+
 import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -17,6 +18,7 @@ ENABLE_OPTIMIZATION = os.getenv("ENABLE_OPTIMIZATION", "true").lower() == "true"
 model = None
 tokenizer = None
 device = None
+
 
 def get_optimal_device():
     """Detect and configure the optimal device for inference."""
@@ -32,7 +34,9 @@ def get_optimal_device():
         if torch.cuda.is_available():
             device = torch.device("cuda")
             logger.info(f"Using CUDA device: {torch.cuda.get_device_name()}")
-            logger.info(f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB")
+            logger.info(
+                f"CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB"
+            )
         else:
             logger.warning("CUDA requested but not available, falling back to CPU")
             device = torch.device("cpu")
@@ -48,6 +52,7 @@ def get_optimal_device():
 
     return device
 
+
 def optimize_model(model, device):
     """Apply various optimizations to the model."""
     if not ENABLE_OPTIMIZATION:
@@ -60,9 +65,7 @@ def optimize_model(model, device):
         try:
             logger.info("Applying dynamic quantization for CPU...")
             quantized_model = torch.quantization.quantize_dynamic(
-                model,
-                {torch.nn.Linear},  # Quantize linear layers
-                dtype=torch.qint8
+                model, {torch.nn.Linear}, dtype=torch.qint8  # Quantize linear layers
             )
             logger.info("Dynamic quantization applied successfully")
             return quantized_model
@@ -73,11 +76,11 @@ def optimize_model(model, device):
     if device.type == "cuda":
         try:
             # Enable optimized attention (if available)
-            if hasattr(torch.nn.functional, 'scaled_dot_product_attention'):
+            if hasattr(torch.nn.functional, "scaled_dot_product_attention"):
                 logger.info("Using optimized scaled dot product attention")
 
             # Compile model for faster inference (PyTorch 2.0+)
-            if hasattr(torch, 'compile'):
+            if hasattr(torch, "compile"):
                 logger.info("Compiling model with torch.compile...")
                 compiled_model = torch.compile(model, mode="reduce-overhead")
                 logger.info("Model compilation completed")
@@ -89,13 +92,14 @@ def optimize_model(model, device):
     # Memory optimization
     try:
         # Enable memory efficient attention if available
-        if hasattr(model.config, 'use_memory_efficient_attention'):
+        if hasattr(model.config, "use_memory_efficient_attention"):
             model.config.use_memory_efficient_attention = True
             logger.info("Enabled memory efficient attention")
     except Exception as e:
         logger.debug(f"Memory optimization not available: {e}")
 
     return model
+
 
 async def init_model():
     global model, tokenizer, device
@@ -112,7 +116,7 @@ async def init_model():
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
             torch_dtype=torch.float16 if device.type == "cuda" else torch.float32,
-            low_cpu_mem_usage=True
+            low_cpu_mem_usage=True,
         )
 
         # Move model to device
@@ -127,12 +131,17 @@ async def init_model():
         logger.info(f"Model loaded successfully on {device}")
 
         # Log model info
-        if hasattr(model, 'config'):
+        if hasattr(model, "config"):
             logger.info(f"Model parameters: ~{model.num_parameters() / 1e6:.1f}M")
 
         if device.type == "cuda":
-            logger.info(f"GPU memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f}GB")
-            logger.info(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1e9:.2f}GB")
+            logger.info(
+                f"GPU memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f}GB"
+            )
+            logger.info(
+                f"GPU memory reserved: {torch.cuda.memory_reserved() / 1e9:.2f}GB"
+            )
+
 
 async def generate_text(prompt: str, max_tokens: int, temperature: float):
     await init_model()
@@ -153,7 +162,7 @@ async def generate_text(prompt: str, max_tokens: int, temperature: float):
                     do_sample=True,
                     pad_token_id=tokenizer.eos_token_id,
                     use_cache=True,
-                    early_stopping=True
+                    early_stopping=True,
                 )
         else:
             # CPU generation
@@ -163,17 +172,19 @@ async def generate_text(prompt: str, max_tokens: int, temperature: float):
                 temperature=temperature,
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
-                use_cache=True
+                use_cache=True,
             )
 
     # Decode response
-    response = tokenizer.decode(outputs[0][inputs.shape[1]:], skip_special_tokens=True)
+    response = tokenizer.decode(outputs[0][inputs.shape[1] :], skip_special_tokens=True)
     return response.strip(), len(outputs[0]) - inputs.shape[1], MODEL_NAME
+
 
 async def health_check():
     """Check if the model and tokenizer are properly loaded."""
     global model, tokenizer
     return model is not None and tokenizer is not None
+
 
 def get_device_info():
     """Get detailed device information for monitoring."""
@@ -186,19 +197,21 @@ def get_device_info():
         "optimizations": {
             "quantization_enabled": ENABLE_QUANTIZATION,
             "optimization_enabled": ENABLE_OPTIMIZATION,
-            "batch_size": BATCH_SIZE
-        }
+            "batch_size": BATCH_SIZE,
+        },
     }
 
     if device.type == "cuda" and torch.cuda.is_available():
-        info.update({
-            "gpu_name": torch.cuda.get_device_name(),
-            "gpu_memory_total": f"{torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB",
-            "gpu_memory_allocated": f"{torch.cuda.memory_allocated() / 1e9:.2f}GB",
-            "gpu_memory_reserved": f"{torch.cuda.memory_reserved() / 1e9:.2f}GB",
-            "cuda_version": torch.version.cuda,
-            "torch_compile_available": hasattr(torch, 'compile')
-        })
+        info.update(
+            {
+                "gpu_name": torch.cuda.get_device_name(),
+                "gpu_memory_total": f"{torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB",
+                "gpu_memory_allocated": f"{torch.cuda.memory_allocated() / 1e9:.2f}GB",
+                "gpu_memory_reserved": f"{torch.cuda.memory_reserved() / 1e9:.2f}GB",
+                "cuda_version": torch.version.cuda,
+                "torch_compile_available": hasattr(torch, "compile"),
+            }
+        )
 
     # Model optimization info
     if model is not None:
@@ -206,7 +219,11 @@ def get_device_info():
             "model_name": MODEL_NAME,
             "model_type": type(model).__name__,
             "is_quantized": "quantized" in str(type(model)).lower(),
-            "parameters": getattr(model, 'num_parameters', lambda: 0)() if hasattr(model, 'num_parameters') else "unknown"
+            "parameters": (
+                getattr(model, "num_parameters", lambda: 0)()
+                if hasattr(model, "num_parameters")
+                else "unknown"
+            ),
         }
 
     return info

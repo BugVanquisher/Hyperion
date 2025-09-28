@@ -7,20 +7,24 @@ Processes alerts from Alertmanager and provides ML-aware alert processing.
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-from pydantic import BaseModel
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
 
 class AlertStatus(str, Enum):
     FIRING = "firing"
     RESOLVED = "resolved"
 
+
 class AlertSeverity(str, Enum):
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
+
 
 class AlertComponent(str, Enum):
     GPU = "gpu"
@@ -29,8 +33,10 @@ class AlertComponent(str, Enum):
     CACHE = "cache"
     API = "api"
 
+
 class AlertmanagerAlert(BaseModel):
     """Single alert from Alertmanager."""
+
     status: AlertStatus
     labels: Dict[str, str]
     annotations: Dict[str, str]
@@ -39,8 +45,10 @@ class AlertmanagerAlert(BaseModel):
     generatorURL: str
     fingerprint: str
 
+
 class AlertmanagerWebhook(BaseModel):
     """Webhook payload from Alertmanager."""
+
     receiver: str
     status: AlertStatus
     alerts: List[AlertmanagerAlert]
@@ -51,6 +59,7 @@ class AlertmanagerWebhook(BaseModel):
     version: str = "4"
     groupKey: str
     truncatedAlerts: int = 0
+
 
 class AlertProcessor:
     """Processes and enriches alerts with ML context."""
@@ -80,7 +89,7 @@ class AlertProcessor:
             "status": webhook.status,
             "alert_count": len(webhook.alerts),
             "group_labels": webhook.groupLabels,
-            "alerts": processed_alerts
+            "alerts": processed_alerts,
         }
 
         self.alert_history.append(alert_event)
@@ -107,7 +116,7 @@ class AlertProcessor:
             "ends_at": alert.endsAt,
             "labels": alert.labels,
             "annotations": alert.annotations,
-            "ml_context": self._extract_ml_context(alert)
+            "ml_context": self._extract_ml_context(alert),
         }
 
         # Add impact assessment
@@ -126,34 +135,42 @@ class AlertProcessor:
         alertname = alert.labels.get("alertname", "")
 
         if component == "gpu":
-            context.update({
-                "gpu_name": alert.labels.get("gpu_name"),
-                "gpu_memory_usage": alert.labels.get("gpu_memory_usage"),
-                "gpu_utilization": alert.labels.get("gpu_utilization"),
-                "anomaly_type": alert.labels.get("anomaly")
-            })
+            context.update(
+                {
+                    "gpu_name": alert.labels.get("gpu_name"),
+                    "gpu_memory_usage": alert.labels.get("gpu_memory_usage"),
+                    "gpu_utilization": alert.labels.get("gpu_utilization"),
+                    "anomaly_type": alert.labels.get("anomaly"),
+                }
+            )
 
         elif component == "ml-inference":
-            context.update({
-                "model_name": alert.labels.get("model_name"),
-                "inference_time": alert.labels.get("inference_time"),
-                "failure_rate": alert.labels.get("failure_rate"),
-                "anomaly_type": alert.labels.get("anomaly")
-            })
+            context.update(
+                {
+                    "model_name": alert.labels.get("model_name"),
+                    "inference_time": alert.labels.get("inference_time"),
+                    "failure_rate": alert.labels.get("failure_rate"),
+                    "anomaly_type": alert.labels.get("anomaly"),
+                }
+            )
 
         elif component == "batch-processing":
-            context.update({
-                "avg_batch_size": alert.labels.get("avg_batch_size"),
-                "batch_duration": alert.labels.get("batch_duration"),
-                "queue_depth": alert.labels.get("queue_depth")
-            })
+            context.update(
+                {
+                    "avg_batch_size": alert.labels.get("avg_batch_size"),
+                    "batch_duration": alert.labels.get("batch_duration"),
+                    "queue_depth": alert.labels.get("queue_depth"),
+                }
+            )
 
         elif component == "cache":
-            context.update({
-                "cache_hit_rate": alert.labels.get("cache_hit_rate"),
-                "cache_size": alert.labels.get("cache_size"),
-                "cache_eviction_rate": alert.labels.get("cache_eviction_rate")
-            })
+            context.update(
+                {
+                    "cache_hit_rate": alert.labels.get("cache_hit_rate"),
+                    "cache_size": alert.labels.get("cache_size"),
+                    "cache_eviction_rate": alert.labels.get("cache_eviction_rate"),
+                }
+            )
 
         return context
 
@@ -169,47 +186,59 @@ class AlertProcessor:
             "performance_degradation": False,
             "cost_impact": False,
             "service_availability": "normal",
-            "estimated_recovery_time": "unknown"
+            "estimated_recovery_time": "unknown",
         }
 
         # GPU alerts
         if component == "gpu":
             if "Critical" in alertname or severity == "critical":
-                impact.update({
-                    "user_facing": True,
-                    "performance_degradation": True,
-                    "service_availability": "degraded",
-                    "estimated_recovery_time": "5-15 minutes"
-                })
+                impact.update(
+                    {
+                        "user_facing": True,
+                        "performance_degradation": True,
+                        "service_availability": "degraded",
+                        "estimated_recovery_time": "5-15 minutes",
+                    }
+                )
             elif "MemoryHigh" in alertname:
-                impact.update({
-                    "performance_degradation": True,
-                    "cost_impact": True,
-                    "service_availability": "at_risk"
-                })
+                impact.update(
+                    {
+                        "performance_degradation": True,
+                        "cost_impact": True,
+                        "service_availability": "at_risk",
+                    }
+                )
 
         # Inference alerts
         elif component == "ml-inference":
             if "Down" in alertname or "Failure" in alertname:
-                impact.update({
-                    "user_facing": True,
-                    "service_availability": "unavailable",
-                    "estimated_recovery_time": "2-10 minutes"
-                })
+                impact.update(
+                    {
+                        "user_facing": True,
+                        "service_availability": "unavailable",
+                        "estimated_recovery_time": "2-10 minutes",
+                    }
+                )
             elif "Latency" in alertname:
-                impact.update({
-                    "user_facing": True,
-                    "performance_degradation": True,
-                    "service_availability": "degraded"
-                })
+                impact.update(
+                    {
+                        "user_facing": True,
+                        "performance_degradation": True,
+                        "service_availability": "degraded",
+                    }
+                )
 
         # Batch processing alerts
         elif component == "batch-processing":
-            impact.update({
-                "performance_degradation": True,
-                "cost_impact": True,
-                "service_availability": "degraded" if "Stalled" in alertname else "at_risk"
-            })
+            impact.update(
+                {
+                    "performance_degradation": True,
+                    "cost_impact": True,
+                    "service_availability": (
+                        "degraded" if "Stalled" in alertname else "at_risk"
+                    ),
+                }
+            )
 
         return impact
 
@@ -222,67 +251,83 @@ class AlertProcessor:
 
         if component == "gpu":
             if "MemoryHigh" in alertname:
-                actions.extend([
-                    "Check for memory leaks in model inference code",
-                    "Consider reducing batch size temporarily",
-                    "Monitor GPU memory allocation patterns",
-                    "Review recent model deployments for memory inefficiencies"
-                ])
+                actions.extend(
+                    [
+                        "Check for memory leaks in model inference code",
+                        "Consider reducing batch size temporarily",
+                        "Monitor GPU memory allocation patterns",
+                        "Review recent model deployments for memory inefficiencies",
+                    ]
+                )
             elif "MemoryCritical" in alertname:
-                actions.extend([
-                    "IMMEDIATE: Restart GPU-enabled pods to clear memory",
-                    "Scale down non-essential GPU workloads",
-                    "Implement emergency batch size reduction",
-                    "Contact on-call engineer immediately"
-                ])
+                actions.extend(
+                    [
+                        "IMMEDIATE: Restart GPU-enabled pods to clear memory",
+                        "Scale down non-essential GPU workloads",
+                        "Implement emergency batch size reduction",
+                        "Contact on-call engineer immediately",
+                    ]
+                )
             elif "MemoryLeak" in alertname:
-                actions.extend([
-                    "Profile GPU memory usage over time",
-                    "Check for unreleased tensors in model code",
-                    "Review garbage collection settings",
-                    "Consider rolling restart of inference pods"
-                ])
+                actions.extend(
+                    [
+                        "Profile GPU memory usage over time",
+                        "Check for unreleased tensors in model code",
+                        "Review garbage collection settings",
+                        "Consider rolling restart of inference pods",
+                    ]
+                )
 
         elif component == "ml-inference":
             if "HighInferenceLatency" in alertname:
-                actions.extend([
-                    "Check GPU utilization and memory pressure",
-                    "Review recent model changes or updates",
-                    "Monitor batch processing efficiency",
-                    "Consider horizontal scaling if sustained"
-                ])
+                actions.extend(
+                    [
+                        "Check GPU utilization and memory pressure",
+                        "Review recent model changes or updates",
+                        "Monitor batch processing efficiency",
+                        "Consider horizontal scaling if sustained",
+                    ]
+                )
             elif "InferenceDown" in alertname:
-                actions.extend([
-                    "Check application logs for errors",
-                    "Verify model loading status",
-                    "Restart inference service pods",
-                    "Check underlying infrastructure health"
-                ])
+                actions.extend(
+                    [
+                        "Check application logs for errors",
+                        "Verify model loading status",
+                        "Restart inference service pods",
+                        "Check underlying infrastructure health",
+                    ]
+                )
 
         elif component == "batch-processing":
             if "BatchProcessingSlow" in alertname:
-                actions.extend([
-                    "Review batch size configuration",
-                    "Check for processing bottlenecks",
-                    "Monitor queue depth trends",
-                    "Consider batch timeout adjustments"
-                ])
+                actions.extend(
+                    [
+                        "Review batch size configuration",
+                        "Check for processing bottlenecks",
+                        "Monitor queue depth trends",
+                        "Consider batch timeout adjustments",
+                    ]
+                )
             elif "BatchProcessingStalled" in alertname:
-                actions.extend([
-                    "Restart batch processing components",
-                    "Check for deadlocks or blocking operations",
-                    "Review batch processing logs for errors",
-                    "Verify queue connectivity"
-                ])
+                actions.extend(
+                    [
+                        "Restart batch processing components",
+                        "Check for deadlocks or blocking operations",
+                        "Review batch processing logs for errors",
+                        "Verify queue connectivity",
+                    ]
+                )
 
         elif component == "cache":
             if "CacheHitRateLow" in alertname:
-                actions.extend([
-                    "Review cache TTL settings",
-                    "Check for cache key distribution issues",
-                    "Monitor cache memory usage",
-                    "Consider cache warming strategies"
-                ])
+                actions.extend(
+                    [
+                        "Review cache TTL settings",
+                        "Check for cache key distribution issues",
+                        "Monitor cache memory usage",
+                        "Consider cache warming strategies",
+                    ]
+                )
 
         # Add general actions for all critical alerts
         if alert.labels.get("severity") == "critical":
@@ -295,14 +340,24 @@ class AlertProcessor:
         """Get summary of current alert state."""
 
         active_count = len(self.active_alerts)
-        critical_count = sum(1 for alert in self.active_alerts.values()
-                           if alert.labels.get("severity") == "critical")
+        critical_count = sum(
+            1
+            for alert in self.active_alerts.values()
+            if alert.labels.get("severity") == "critical"
+        )
 
-        components_affected = set(alert.labels.get("component", "unknown")
-                                for alert in self.active_alerts.values())
+        components_affected = set(
+            alert.labels.get("component", "unknown")
+            for alert in self.active_alerts.values()
+        )
 
-        recent_alerts = len([alert for alert in self.alert_history[-50:]
-                           if alert["status"] == AlertStatus.FIRING])
+        recent_alerts = len(
+            [
+                alert
+                for alert in self.alert_history[-50:]
+                if alert["status"] == AlertStatus.FIRING
+            ]
+        )
 
         return {
             "active_alerts": active_count,
@@ -310,8 +365,11 @@ class AlertProcessor:
             "components_affected": list(components_affected),
             "recent_firing_alerts": recent_alerts,
             "alert_history_size": len(self.alert_history),
-            "last_alert": self.alert_history[-1]["timestamp"] if self.alert_history else None
+            "last_alert": (
+                self.alert_history[-1]["timestamp"] if self.alert_history else None
+            ),
         }
+
 
 # Global alert processor instance
 alert_processor = AlertProcessor()

@@ -8,9 +8,10 @@ log aggregation and analysis in ELK stack.
 import json
 import logging
 import sys
-from datetime import datetime
-from typing import Dict, Any, Optional
 import traceback
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 
 class MLJSONFormatter(logging.Formatter):
     """
@@ -34,7 +35,7 @@ class MLJSONFormatter(logging.Formatter):
             "thread": record.thread,
             "process": record.process,
             "service": "hyperion",
-            "component": "ml-inference"
+            "component": "ml-inference",
         }
 
         # Add exception information if present
@@ -42,11 +43,11 @@ class MLJSONFormatter(logging.Formatter):
             log_data["exception"] = {
                 "type": record.exc_info[0].__name__ if record.exc_info[0] else None,
                 "message": str(record.exc_info[1]) if record.exc_info[1] else None,
-                "traceback": traceback.format_exception(*record.exc_info)
+                "traceback": traceback.format_exception(*record.exc_info),
             }
 
         # Add custom fields from record
-        if hasattr(record, 'extra_fields'):
+        if hasattr(record, "extra_fields"):
             log_data.update(record.extra_fields)
 
         # Add ML-specific context if available
@@ -56,7 +57,9 @@ class MLJSONFormatter(logging.Formatter):
 
         return json.dumps(log_data, default=str)
 
-    def _extract_ml_context(self, record: logging.LogRecord) -> Optional[Dict[str, Any]]:
+    def _extract_ml_context(
+        self, record: logging.LogRecord
+    ) -> Optional[Dict[str, Any]]:
         """Extract ML-specific context from log record."""
         ml_context = {}
         message = record.getMessage().lower()
@@ -95,6 +98,7 @@ class MLJSONFormatter(logging.Formatter):
 
         return ml_context if ml_context else None
 
+
 class MLContextAdapter(logging.LoggerAdapter):
     """
     Logger adapter that adds ML-specific context to log records.
@@ -103,19 +107,20 @@ class MLContextAdapter(logging.LoggerAdapter):
     def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple:
         """Process log message and add ML context."""
         # Get extra fields from kwargs
-        extra = kwargs.get('extra', {})
+        extra = kwargs.get("extra", {})
 
         # Add ML context from adapter
         if self.extra:
             extra.update(self.extra)
 
-        kwargs['extra'] = extra
+        kwargs["extra"] = extra
         return msg, kwargs
+
 
 def setup_structured_logging(
     service_name: str = "hyperion-app",
     log_level: str = "INFO",
-    enable_json: bool = True
+    enable_json: bool = True,
 ) -> logging.Logger:
     """
     Set up structured logging for the application.
@@ -145,7 +150,7 @@ def setup_structured_logging(
     else:
         # Use standard formatter for development
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
 
     handler.setFormatter(formatter)
@@ -157,6 +162,7 @@ def setup_structured_logging(
     logging.getLogger("torch").setLevel(logging.WARNING)
 
     return logger
+
 
 def get_ml_logger(name: str, **context) -> MLContextAdapter:
     """
@@ -172,73 +178,83 @@ def get_ml_logger(name: str, **context) -> MLContextAdapter:
     logger = logging.getLogger(name)
     return MLContextAdapter(logger, context)
 
+
 # Utility functions for common ML logging patterns
 def log_gpu_metrics(logger: logging.Logger, device_info: Dict[str, Any]):
     """Log GPU metrics in a structured way."""
     logger.info(
         "GPU metrics recorded",
         extra={
-            'extra_fields': {
-                'ml': {
-                    'device_type': 'gpu',
-                    'operation': 'monitoring',
-                    'gpu_name': device_info.get('gpu_name'),
-                    'memory_allocated': device_info.get('gpu_memory_allocated'),
-                    'memory_reserved': device_info.get('gpu_memory_reserved'),
-                    'memory_total': device_info.get('gpu_memory_total')
+            "extra_fields": {
+                "ml": {
+                    "device_type": "gpu",
+                    "operation": "monitoring",
+                    "gpu_name": device_info.get("gpu_name"),
+                    "memory_allocated": device_info.get("gpu_memory_allocated"),
+                    "memory_reserved": device_info.get("gpu_memory_reserved"),
+                    "memory_total": device_info.get("gpu_memory_total"),
                 }
             }
-        }
+        },
     )
 
-def log_batch_metrics(logger: logging.Logger, batch_size: int, duration: float, avg_time: float):
+
+def log_batch_metrics(
+    logger: logging.Logger, batch_size: int, duration: float, avg_time: float
+):
     """Log batch processing metrics in a structured way."""
     logger.info(
         f"Batch processing completed: {batch_size} requests in {duration:.3f}s",
         extra={
-            'extra_fields': {
-                'ml': {
-                    'operation': 'batching',
-                    'phase': 'completed',
-                    'batch_size': batch_size,
-                    'duration_seconds': duration,
-                    'avg_time_seconds': avg_time
+            "extra_fields": {
+                "ml": {
+                    "operation": "batching",
+                    "phase": "completed",
+                    "batch_size": batch_size,
+                    "duration_seconds": duration,
+                    "avg_time_seconds": avg_time,
                 }
             }
-        }
+        },
     )
 
-def log_inference_metrics(logger: logging.Logger, model_name: str, tokens: int, time_ms: int):
+
+def log_inference_metrics(
+    logger: logging.Logger, model_name: str, tokens: int, time_ms: int
+):
     """Log model inference metrics in a structured way."""
     logger.info(
         f"Model inference completed: {tokens} tokens in {time_ms}ms",
         extra={
-            'extra_fields': {
-                'ml': {
-                    'operation': 'inference',
-                    'phase': 'completed',
-                    'model_name': model_name,
-                    'tokens_generated': tokens,
-                    'processing_time_ms': time_ms
+            "extra_fields": {
+                "ml": {
+                    "operation": "inference",
+                    "phase": "completed",
+                    "model_name": model_name,
+                    "tokens_generated": tokens,
+                    "processing_time_ms": time_ms,
                 }
             }
-        }
+        },
     )
 
-def log_cache_operation(logger: logging.Logger, operation: str, key: str, hit: bool = None):
+
+def log_cache_operation(
+    logger: logging.Logger, operation: str, key: str, hit: bool = None
+):
     """Log cache operations in a structured way."""
     extra_data = {
-        'ml': {
-            'operation': 'caching',
-            'cache_operation': operation,
-            'cache_key_preview': key[:50] + "..." if len(key) > 50 else key
+        "ml": {
+            "operation": "caching",
+            "cache_operation": operation,
+            "cache_key_preview": key[:50] + "..." if len(key) > 50 else key,
         }
     }
 
     if hit is not None:
-        extra_data['ml']['cache_result'] = 'hit' if hit else 'miss'
+        extra_data["ml"]["cache_result"] = "hit" if hit else "miss"
 
     logger.info(
         f"Cache {operation}: {'hit' if hit else 'miss' if hit is not None else 'operation'}",
-        extra={'extra_fields': extra_data}
+        extra={"extra_fields": extra_data},
     )

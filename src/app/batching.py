@@ -4,17 +4,17 @@ Collects multiple inference requests and processes them together.
 """
 
 import asyncio
-import time
 import logging
-from typing import List, Dict, Any, Tuple
-from dataclasses import dataclass
+import time
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 # Import tracing utilities
 try:
-    from .tracing import trace_operation, add_span_attributes
+    from .tracing import add_span_attributes, trace_operation
 except ImportError:
     # Fallback if tracing is not available
     from contextlib import contextmanager
@@ -30,6 +30,7 @@ except ImportError:
 @dataclass
 class BatchRequest:
     """A single request within a batch."""
+
     prompt: str
     max_tokens: int
     temperature: float
@@ -40,6 +41,7 @@ class BatchRequest:
 @dataclass
 class BatchResult:
     """Result of a batched inference."""
+
     response: str
     tokens_used: int
     model_name: str
@@ -58,7 +60,7 @@ class RequestBatcher:
         self,
         max_batch_size: int = 8,
         max_wait_time: float = 0.1,  # 100ms
-        enable_batching: bool = True
+        enable_batching: bool = True,
     ):
         self.max_batch_size = max_batch_size
         self.max_wait_time = max_wait_time
@@ -73,15 +75,13 @@ class RequestBatcher:
         self.total_batches = 0
         self.total_batch_time = 0.0
 
-        logger.info(f"RequestBatcher initialized: max_batch_size={max_batch_size}, "
-                   f"max_wait_time={max_wait_time}s, enabled={enable_batching}")
+        logger.info(
+            f"RequestBatcher initialized: max_batch_size={max_batch_size}, "
+            f"max_wait_time={max_wait_time}s, enabled={enable_batching}"
+        )
 
     async def add_request(
-        self,
-        prompt: str,
-        max_tokens: int,
-        temperature: float,
-        request_id: str
+        self, prompt: str, max_tokens: int, temperature: float, request_id: str
     ) -> BatchResult:
         """
         Add a request to the batch queue and wait for result.
@@ -91,15 +91,18 @@ class RequestBatcher:
         if not self.enable_batching:
             # Process immediately without batching
             from .models.llm import generate_text
+
             start_time = time.time()
-            response, tokens, model_name = await generate_text(prompt, max_tokens, temperature)
+            response, tokens, model_name = await generate_text(
+                prompt, max_tokens, temperature
+            )
             processing_time = int((time.time() - start_time) * 1000)
 
             return BatchResult(
                 response=response,
                 tokens_used=tokens,
                 model_name=model_name,
-                processing_time_ms=processing_time
+                processing_time_ms=processing_time,
             )
 
         # Create future for this request
@@ -110,7 +113,7 @@ class RequestBatcher:
             max_tokens=max_tokens,
             temperature=temperature,
             request_id=request_id,
-            future=future
+            future=future,
         )
 
         async with self.batch_lock:
@@ -159,10 +162,13 @@ class RequestBatcher:
             batch = self.pending_requests.copy()
             self.pending_requests.clear()
 
-        with trace_operation("batch_processing", {
-            "batch_size": len(batch),
-            "request_ids": [req.request_id for req in batch[:5]]  # First 5 IDs
-        }) as span:
+        with trace_operation(
+            "batch_processing",
+            {
+                "batch_size": len(batch),
+                "request_ids": [req.request_id for req in batch[:5]],  # First 5 IDs
+            },
+        ) as span:
             logger.info(f"Processing batch of {len(batch)} requests")
             batch_start_time = time.time()
 
@@ -173,10 +179,13 @@ class RequestBatcher:
 
                 # Process each group
                 for group_idx, group in enumerate(grouped_requests):
-                    with trace_operation(f"batch_group_{group_idx}", {
-                        "group_size": len(group),
-                        "group_max_tokens": group[0].max_tokens if group else 0
-                    }):
+                    with trace_operation(
+                        f"batch_group_{group_idx}",
+                        {
+                            "group_size": len(group),
+                            "group_max_tokens": group[0].max_tokens if group else 0,
+                        },
+                    ):
                         await self._process_request_group(group)
 
                 add_span_attributes(span, {"success": True})
@@ -194,15 +203,22 @@ class RequestBatcher:
                 self.total_batches += 1
                 self.total_batch_time += batch_time
 
-                add_span_attributes(span, {
-                    "batch_processing_time_ms": int(batch_time * 1000),
-                    "total_batches_processed": self.total_batches
-                })
+                add_span_attributes(
+                    span,
+                    {
+                        "batch_processing_time_ms": int(batch_time * 1000),
+                        "total_batches_processed": self.total_batches,
+                    },
+                )
 
-            logger.info(f"Batch completed in {batch_time:.3f}s, "
-                       f"avg_batch_time={self.total_batch_time/self.total_batches:.3f}s")
+            logger.info(
+                f"Batch completed in {batch_time:.3f}s, "
+                f"avg_batch_time={self.total_batch_time/self.total_batches:.3f}s"
+            )
 
-    def _group_similar_requests(self, requests: List[BatchRequest]) -> List[List[BatchRequest]]:
+    def _group_similar_requests(
+        self, requests: List[BatchRequest]
+    ) -> List[List[BatchRequest]]:
         """Group requests with similar parameters for efficient batching."""
         # For now, group by temperature and max_tokens
         groups = defaultdict(list)
@@ -220,6 +236,7 @@ class RequestBatcher:
             request = requests[0]
             try:
                 from .models.llm import generate_text
+
                 start_time = time.time()
                 response, tokens, model_name = await generate_text(
                     request.prompt, request.max_tokens, request.temperature
@@ -230,7 +247,7 @@ class RequestBatcher:
                     response=response,
                     tokens_used=tokens,
                     model_name=model_name,
-                    processing_time_ms=processing_time
+                    processing_time_ms=processing_time,
                 )
                 request.future.set_result(result)
 
@@ -247,6 +264,7 @@ class RequestBatcher:
         # In a full implementation, this would use actual batch inference
 
         from .models.llm import generate_text
+
         start_time = time.time()
 
         tasks = []
@@ -259,10 +277,13 @@ class RequestBatcher:
         # Wait for all to complete
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _generate_single_in_batch(self, request: BatchRequest, batch_start_time: float):
+    async def _generate_single_in_batch(
+        self, request: BatchRequest, batch_start_time: float
+    ):
         """Generate response for a single request within a batch."""
         try:
             from .models.llm import generate_text
+
             response, tokens, model_name = await generate_text(
                 request.prompt, request.max_tokens, request.temperature
             )
@@ -274,7 +295,7 @@ class RequestBatcher:
                 response=response,
                 tokens_used=tokens,
                 model_name=model_name,
-                processing_time_ms=processing_time
+                processing_time_ms=processing_time,
             )
             request.future.set_result(result)
 
@@ -284,8 +305,7 @@ class RequestBatcher:
     def get_stats(self) -> Dict[str, Any]:
         """Get batching statistics."""
         avg_batch_time = (
-            self.total_batch_time / self.total_batches
-            if self.total_batches > 0 else 0
+            self.total_batch_time / self.total_batches if self.total_batches > 0 else 0
         )
 
         return {
@@ -293,11 +313,12 @@ class RequestBatcher:
             "total_batches": self.total_batches,
             "avg_requests_per_batch": (
                 self.total_requests / self.total_batches
-                if self.total_batches > 0 else 0
+                if self.total_batches > 0
+                else 0
             ),
             "avg_batch_time_ms": avg_batch_time * 1000,
             "pending_requests": len(self.pending_requests),
-            "batching_enabled": self.enable_batching
+            "batching_enabled": self.enable_batching,
         }
 
 
@@ -318,7 +339,7 @@ def get_batcher() -> RequestBatcher:
         _batcher = RequestBatcher(
             max_batch_size=max_batch_size,
             max_wait_time=max_wait_time,
-            enable_batching=enable_batching
+            enable_batching=enable_batching,
         )
 
     return _batcher
