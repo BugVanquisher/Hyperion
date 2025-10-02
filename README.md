@@ -16,7 +16,7 @@ Built with **Python + FastAPI**, featuring **GPU optimization**, **intelligent b
 
 ## ✨ Current Features (v3.0)
 - **🔥 GPU-Accelerated Inference**: NVIDIA CUDA support with automatic detection and mixed-precision optimization
-- **⚡ Intelligent Request Batching**: Dynamic batching system for 10x+ throughput improvements
+- **⚡ Intelligent Request Batching**: True batch tensor inference with automatic request grouping and parameter-aware batching
 - **📈 Advanced Autoscaling**: HPA, KEDA, and VPA with custom metrics and event-driven scaling
 - **🧠 Model Optimization**: Dynamic quantization, PyTorch compilation, and memory-efficient attention
 - **⭐ Production APIs**: RESTful endpoints with comprehensive validation and batch analytics
@@ -286,12 +286,12 @@ uvicorn src.app.main:app --reload --host 0.0.0.0 --port 8000
 ## 📊 Performance & Monitoring
 
 ### Current Performance (v3.0)
-- **GPU Inference**: 10-50ms (CUDA optimized)
+- **GPU Inference**: 10-50ms (CUDA optimized with true batch processing)
 - **CPU Inference**: 200-500ms (quantized + optimized)
 - **Cached Requests**: 50-200ms (Redis lookup)
-- **Throughput**: 100-500 requests/second (GPU batching)
+- **Throughput**: 100-500 requests/second (depends on batch size and GPU availability)
 - **Model Size**: ~124M parameters (DialoGPT-small)
-- **Batch Processing**: 2-8 requests per batch (configurable)
+- **Batch Processing**: 2-8 requests per batch with true tensor batching (configurable)
 - **Memory Usage**: 2-8GB GPU / 4-16GB RAM (auto-optimized)
 
 ### Monitoring Endpoints (Enhanced v3.0)
@@ -420,10 +420,10 @@ hyperion/
 
 ### 🔧 Previous Phase Achievements (Phase 1-2)
 - **🔥 GPU Acceleration**: NVIDIA CUDA support with automatic detection and mixed-precision optimization
-- **⚡ Intelligent Batching**: Dynamic request batching system for 10x+ throughput improvements
+- **⚡ True Batch Inference**: Parameter-aware request grouping with native PyTorch batch tensor operations
 - **📈 Advanced Autoscaling**: HPA, KEDA, and VPA with custom metrics and event-driven triggers
 - **🧠 Model Optimization**: Dynamic quantization, PyTorch compilation, and memory-efficient attention
-- **🐳 Enterprise Deployment**: GPU-enabled Docker images, advanced K8s manifests, and Helm charts
+- **🐳 Enterprise Deployment**: GPU-enabled Docker images, advanced K8s manifests, and production-ready Helm charts
 - **🧪 Performance Testing**: Professional benchmarking suite with concurrent load testing
 
 ## 📈 Next Steps (Phase 4+)
@@ -586,11 +586,12 @@ Monitor test results in real-time:
 **Built with ❤️ for production-scale ML inference**
 
 **🚀 Ready for Enterprise Deployment**
-- **GPU-accelerated** inference with **10x performance gains**
+- **GPU-accelerated** inference with **true batch tensor processing**
 - **Intelligent autoscaling** from **0 to 15+ replicas**
 - **Production-grade** observability with **end-to-end visibility**
 - **ML-aware alerting** with **statistical anomaly detection**
 - **Battle-tested** with comprehensive benchmarking and monitoring
+- **Complete Helm charts** with CPU and GPU deployment support
 
 Ready to deploy? Choose your path:
 - **Quick Start**: `./setup.sh start-gpu` for local GPU testing
