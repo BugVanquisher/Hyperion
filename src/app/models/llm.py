@@ -112,6 +112,10 @@ async def init_model():
         # Load tokenizer
         tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
+        # Set pad_token if not already set (required for batch processing)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
         # Load model with device configuration
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
