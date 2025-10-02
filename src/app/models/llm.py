@@ -229,9 +229,7 @@ async def generate_text_batch(
         # Decode each response in the batch
         for i, (idx, output) in enumerate(zip(indices, outputs)):
             input_length = input_ids[i].shape[0]
-            response = tokenizer.decode(
-                output[input_length:], skip_special_tokens=True
-            )
+            response = tokenizer.decode(output[input_length:], skip_special_tokens=True)
             tokens_generated = len(output) - input_length
             results[idx] = (response.strip(), tokens_generated, MODEL_NAME)
 
