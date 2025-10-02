@@ -261,9 +261,7 @@ async def chat(req: ChatRequest):
 
                 if cached_response:
                     CACHE_REQUESTS.labels(status="hit").inc()
-                    cached_data = eval(
-                        cached_response
-                    )  # Note: In production, use json.loads
+                    cached_data = json.loads(cached_response)
                     cached_data["cached"] = True
                     cache_hit = True
 
@@ -363,7 +361,7 @@ async def chat(req: ChatRequest):
             try:
                 r = await get_cache()
                 cache_ttl = 300  # 5 minutes
-                await r.setex(key, cache_ttl, repr(response_data.model_dump()))
+                await r.setex(key, cache_ttl, json.dumps(response_data.model_dump()))
                 log_cache_operation(ml_logger, "store", key)
                 add_span_attributes(span, {"response_cached": True})
             except Exception as e:
