@@ -35,7 +35,7 @@ groups:
       service: hyperion-app
     annotations:
       summary: "Potential GPU memory leak detected"
-      description: "GPU memory has increased by {{ $value | humanizeBytes }} in the last hour and is currently at {{ printf \"%.1f\" ((gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100) }}%"
+      description: "GPU memory has increased by {{ $value }} bytes in the last hour (potential memory leak)"
 
 # Model Inference Alerting Rules
 - name: inference-alerts
@@ -187,11 +187,9 @@ groups:
   # GPU memory usage deviation from normal pattern
   - alert: GPUMemoryAnomalyHigh
     expr: |
-      (
-        gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100
-        -
-        avg_over_time(gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100[1h] offset 1d)
-      ) > (2 * stddev_over_time(gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100[1h] offset 1d))
+      (gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100) >
+      (avg_over_time((gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100)[1h:1m]) +
+       2 * stddev_over_time((gpu_memory_allocated_bytes / gpu_memory_total_bytes * 100)[1h:1m]))
     for: 10m
     labels:
       severity: warning
@@ -205,11 +203,9 @@ groups:
   # Inference latency anomaly detection
   - alert: InferenceLatencyAnomaly
     expr: |
-      (
-        histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))
-        -
-        avg_over_time(histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))[1h] offset 1d)
-      ) > (2 * stddev_over_time(histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))[1h] offset 1d))
+      histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m])) >
+      (avg_over_time(histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))[1h:1m]) +
+       2 * stddev_over_time(histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))[1h:1m]))
     for: 15m
     labels:
       severity: warning
@@ -223,11 +219,9 @@ groups:
   # Request rate anomaly (sudden drop might indicate issues)
   - alert: RequestRateAnomalyLow
     expr: |
-      (
-        avg_over_time(rate(http_requests_total{path="/v1/llm/chat"}[5m])[1h] offset 1d)
-        -
-        rate(http_requests_total{path="/v1/llm/chat"}[5m])
-      ) > (2 * stddev_over_time(rate(http_requests_total{path="/v1/llm/chat"}[5m])[1h] offset 1d))
+      rate(http_requests_total{path="/v1/llm/chat"}[5m]) <
+      (avg_over_time(rate(http_requests_total{path="/v1/llm/chat"}[5m])[1h:1m]) -
+       2 * stddev_over_time(rate(http_requests_total{path="/v1/llm/chat"}[5m])[1h:1m]))
     for: 20m
     labels:
       severity: warning

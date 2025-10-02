@@ -1,202 +1,251 @@
 {
-  "dashboard": {
-    "id": null,
-    "title": "Hyperion Batch Performance",
-    "tags": ["hyperion", "batch", "performance"],
-    "style": "dark",
-    "timezone": "browser",
-    "editable": true,
-    "fiscalYearStartMonth": 0,
-    "graphTooltip": 1,
-    "hideControls": false,
-    "links": [],
-    "liveNow": false,
-    "panels": [
-      {
-        "id": 1,
-        "title": "Batch Wait Time",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.50, rate(batch_wait_time_seconds_bucket[5m]))",
-            "refId": "A",
-            "legendFormat": "50th percentile"
-          },
-          {
-            "expr": "histogram_quantile(0.90, rate(batch_wait_time_seconds_bucket[5m]))",
-            "refId": "B",
-            "legendFormat": "90th percentile"
-          },
-          {
-            "expr": "histogram_quantile(0.99, rate(batch_wait_time_seconds_bucket[5m]))",
-            "refId": "C",
-            "legendFormat": "99th percentile"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-        "yAxes": [
-          {
-            "label": "Wait Time (seconds)",
-            "min": 0
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2
-      },
-      {
-        "id": 2,
-        "title": "Batch Size Distribution",
-        "type": "piechart",
-        "targets": [
-          {
-            "expr": "sum by (batch_size) (rate(batch_requests_total[5m]))",
-            "refId": "A",
-            "legendFormat": "Size {{batch_size}}"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-        "options": {
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          },
-          "pieType": "pie",
-          "tooltip": {"mode": "single"},
-          "legend": {
-            "displayMode": "table",
-            "placement": "right"
-          }
-        }
-      },
-      {
-        "id": 3,
-        "title": "Batch Processing Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(batch_requests_total[1m])",
-            "refId": "A",
-            "legendFormat": "Batch Size {{batch_size}}"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-        "yAxes": [
-          {
-            "label": "Batches/sec",
-            "min": 0
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2,
-        "stack": true
-      },
-      {
-        "id": 4,
-        "title": "Cache Hit Rate",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "rate(cache_requests_total{status=\"hit\"}[5m]) / (rate(cache_requests_total{status=\"hit\"}[5m]) + rate(cache_requests_total{status=\"miss\"}[5m])) * 100",
-            "refId": "A",
-            "legendFormat": "Hit Rate"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-        "options": {
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          },
-          "orientation": "auto",
-          "textMode": "auto",
-          "colorMode": "value",
-          "graphMode": "area"
+  "id": null,
+  "uid": "hyperion-batch-performance",
+  "title": "Hyperion Batch Performance",
+  "tags": [
+    "hyperion",
+    "batch",
+    "performance"
+  ],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "hideControls": false,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Batch Wait Time",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(batch_wait_time_seconds_bucket[5m]))",
+          "refId": "A",
+          "legendFormat": "50th percentile"
         },
-        "fieldConfig": {
-          "defaults": {
-            "unit": "percent",
-            "min": 0,
-            "max": 100,
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "steps": [
-                {"color": "red", "value": 0},
-                {"color": "yellow", "value": 70},
-                {"color": "green", "value": 90}
-              ]
+        {
+          "expr": "histogram_quantile(0.90, rate(batch_wait_time_seconds_bucket[5m]))",
+          "refId": "B",
+          "legendFormat": "90th percentile"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(batch_wait_time_seconds_bucket[5m]))",
+          "refId": "C",
+          "legendFormat": "99th percentile"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "yAxes": [
+        {
+          "label": "Wait Time (seconds)",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2
+    },
+    {
+      "id": 2,
+      "title": "Batch Size Distribution",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sum by (batch_size) (rate(batch_requests_total[5m]))",
+          "refId": "A",
+          "legendFormat": "Size {{batch_size}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "pieType": "pie",
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Batch Processing Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(batch_requests_total[1m])",
+          "refId": "A",
+          "legendFormat": "Batch Size {{batch_size}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "yAxes": [
+        {
+          "label": "Batches/sec",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "stack": true
+    },
+    {
+      "id": 4,
+      "title": "Cache Hit Rate",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "rate(cache_requests_total{status=\"hit\"}[5m]) / (rate(cache_requests_total{status=\"hit\"}[5m]) + rate(cache_requests_total{status=\"miss\"}[5m])) * 100",
+          "refId": "A",
+          "legendFormat": "Hit Rate"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "green",
+                "value": 90
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Request Volume by Endpoint",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(http_requests_total[1m])",
+          "refId": "A",
+          "legendFormat": "{{method}} {{path}} ({{status}})"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "yAxes": [
+        {
+          "label": "Requests/sec",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2
+    },
+    {
+      "id": 6,
+      "title": "Model Optimization Status",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "model_optimization_enabled",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
             }
           }
         }
-      },
-      {
-        "id": 5,
-        "title": "Request Volume by Endpoint",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(http_requests_total[1m])",
-            "refId": "A",
-            "legendFormat": "{{method}} {{path}} ({{status}})"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
-        "yAxes": [
-          {
-            "label": "Requests/sec",
-            "min": 0
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2
-      },
-      {
-        "id": 6,
-        "title": "Model Optimization Status",
-        "type": "table",
-        "targets": [
-          {
-            "expr": "model_optimization_enabled",
-            "refId": "A",
-            "format": "table",
-            "instant": true
-          }
-        ],
-        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 24},
-        "transformations": [
-          {
-            "id": "organize",
-            "options": {
-              "excludeByName": {
-                "Time": true,
-                "__name__": true
-              }
-            }
-          }
-        ]
-      }
-    ],
-    "time": {
-      "from": "now-1h",
-      "to": "now"
-    },
-    "refresh": "10s",
-    "schemaVersion": 27,
-    "version": 0
-  }
+      ]
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "schemaVersion": 27,
+  "version": 0,
+  "folderId": 0
 }

@@ -1,350 +1,432 @@
 {
-  "dashboard": {
-    "id": null,
-    "title": "Hyperion Alerting Dashboard",
-    "tags": ["hyperion", "alerts", "monitoring"],
-    "style": "dark",
-    "timezone": "browser",
-    "editable": true,
-    "fiscalYearStartMonth": 0,
-    "graphTooltip": 1,
-    "hideControls": false,
-    "links": [],
-    "liveNow": false,
-    "panels": [
-      {
-        "id": 1,
-        "title": "Alert Status Overview",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "ALERTS{alertstate=\"firing\"}",
-            "refId": "A",
-            "legendFormat": "Firing Alerts"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-        "options": {
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          },
-          "orientation": "auto",
-          "textMode": "auto",
-          "colorMode": "value",
-          "graphMode": "area"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "steps": [
-                {"color": "green", "value": 0},
-                {"color": "yellow", "value": 1},
-                {"color": "red", "value": 5}
-              ]
-            }
-          }
+  "id": null,
+  "uid": "hyperion-alerting",
+  "title": "Hyperion Alerting Dashboard",
+  "tags": [
+    "hyperion",
+    "alerts",
+    "monitoring"
+  ],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "hideControls": false,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Alert Status Overview",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "refId": "A",
+          "legendFormat": "Firing Alerts"
         }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
       },
-      {
-        "id": 2,
-        "title": "Critical Alerts",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "ALERTS{alertstate=\"firing\",severity=\"critical\"}",
-            "refId": "A",
-            "legendFormat": "Critical Alerts"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-        "options": {
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          },
-          "orientation": "auto",
-          "textMode": "auto",
-          "colorMode": "value",
-          "graphMode": "area"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "steps": [
-                {"color": "green", "value": 0},
-                {"color": "red", "value": 1}
-              ]
-            }
-          }
-        }
-      },
-      {
-        "id": 3,
-        "title": "Alerts by Component",
-        "type": "piechart",
-        "targets": [
-          {
-            "expr": "sum by (component) (ALERTS{alertstate=\"firing\"})",
-            "refId": "A",
-            "legendFormat": "{{component}}"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-        "options": {
-          "reduceOptions": {
-            "values": false,
-            "calcs": ["lastNotNull"],
-            "fields": ""
-          },
-          "pieType": "pie",
-          "tooltip": {"mode": "single"},
-          "legend": {
-            "displayMode": "table",
-            "placement": "right"
-          }
-        }
-      },
-      {
-        "id": 4,
-        "title": "Alert Timeline",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "sum by (severity) (ALERTS{alertstate=\"firing\"})",
-            "refId": "A",
-            "legendFormat": "{{severity}}"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-        "yAxes": [
-          {
-            "label": "Alert Count",
-            "min": 0
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2,
-        "stack": true
-      },
-      {
-        "id": 5,
-        "title": "GPU Memory Alert Status",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "(gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100",
-            "refId": "A",
-            "legendFormat": "GPU Memory Usage %"
-          },
-          {
-            "expr": "85",
-            "refId": "B",
-            "legendFormat": "Warning Threshold"
-          },
-          {
-            "expr": "95",
-            "refId": "C",
-            "legendFormat": "Critical Threshold"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
-        "yAxes": [
-          {
-            "label": "Memory Usage (%)",
-            "min": 0,
-            "max": 100
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2,
-        "alert": {
-          "conditions": [
-            {
-              "evaluator": {
-                "params": [85],
-                "type": "gt"
-              },
-              "operator": {
-                "type": "and"
-              },
-              "query": {
-                "params": ["A", "5m", "now"]
-              },
-              "reducer": {
-                "params": [],
-                "type": "last"
-              },
-              "type": "query"
-            }
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
           ],
-          "executionErrorState": "alerting",
-          "for": "5m",
-          "frequency": "10s",
-          "handler": 1,
-          "name": "GPU Memory High",
-          "noDataState": "no_data",
-          "notifications": []
-        }
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area"
       },
-      {
-        "id": 6,
-        "title": "Inference Latency Alert Status",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))",
-            "refId": "A",
-            "legendFormat": "95th Percentile Latency"
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
           },
-          {
-            "expr": "2.0",
-            "refId": "B",
-            "legendFormat": "Warning Threshold"
-          },
-          {
-            "expr": "5.0",
-            "refId": "C",
-            "legendFormat": "Critical Threshold"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
-        "yAxes": [
-          {
-            "label": "Latency (seconds)",
-            "min": 0
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2
-      },
-      {
-        "id": 7,
-        "title": "Active Alerts Table",
-        "type": "table",
-        "targets": [
-          {
-            "expr": "ALERTS{alertstate=\"firing\"}",
-            "refId": "A",
-            "format": "table",
-            "instant": true
-          }
-        ],
-        "gridPos": {"h": 12, "w": 24, "x": 0, "y": 32},
-        "transformations": [
-          {
-            "id": "organize",
-            "options": {
-              "excludeByName": {
-                "Time": true,
-                "__name__": true,
-                "alertstate": true
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
               },
-              "renameByName": {
-                "alertname": "Alert Name",
-                "component": "Component",
-                "severity": "Severity",
-                "instance": "Instance"
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
               }
-            }
+            ]
           }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "align": "left",
-              "displayMode": "auto"
-            }
-          },
-          "overrides": [
-            {
-              "matcher": {
-                "id": "byName",
-                "options": "Severity"
-              },
-              "properties": [
-                {
-                  "id": "custom.displayMode",
-                  "value": "color-background"
-                },
-                {
-                  "id": "color",
-                  "value": {
-                    "mode": "thresholds"
-                  }
-                },
-                {
-                  "id": "thresholds",
-                  "value": {
-                    "steps": [
-                      {"color": "green", "value": null},
-                      {"color": "yellow", "value": "warning"},
-                      {"color": "red", "value": "critical"}
-                    ]
-                  }
-                }
-              ]
-            }
-          ]
         }
-      },
-      {
-        "id": 8,
-        "title": "Alert Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(prometheus_notifications_total[5m])",
-            "refId": "A",
-            "legendFormat": "Notification Rate"
-          },
-          {
-            "expr": "rate(alertmanager_alerts_received_total[5m])",
-            "refId": "B",
-            "legendFormat": "Alerts Received Rate"
-          }
-        ],
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 44},
-        "yAxes": [
-          {
-            "label": "Rate (per second)",
-            "min": 0
-          },
-          {
-            "show": false
-          }
-        ],
-        "lines": true,
-        "fill": 1,
-        "linewidth": 2
       }
-    ],
-    "time": {
-      "from": "now-1h",
-      "to": "now"
     },
-    "refresh": "30s",
-    "schemaVersion": 27,
-    "version": 0
-  }
+    {
+      "id": 2,
+      "title": "Critical Alerts",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\",severity=\"critical\"}",
+          "refId": "A",
+          "legendFormat": "Critical Alerts"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Alerts by Component",
+      "type": "piechart",
+      "targets": [
+        {
+          "expr": "sum by (component) (ALERTS{alertstate=\"firing\"})",
+          "refId": "A",
+          "legendFormat": "{{component}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "pieType": "pie",
+        "tooltip": {
+          "mode": "single"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Alert Timeline",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "sum by (severity) (ALERTS{alertstate=\"firing\"})",
+          "refId": "A",
+          "legendFormat": "{{severity}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "yAxes": [
+        {
+          "label": "Alert Count",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "stack": true
+    },
+    {
+      "id": 5,
+      "title": "GPU Memory Alert Status",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "(gpu_memory_allocated_bytes / gpu_memory_total_bytes) * 100",
+          "refId": "A",
+          "legendFormat": "GPU Memory Usage %"
+        },
+        {
+          "expr": "85",
+          "refId": "B",
+          "legendFormat": "Warning Threshold"
+        },
+        {
+          "expr": "95",
+          "refId": "C",
+          "legendFormat": "Critical Threshold"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "yAxes": [
+        {
+          "label": "Memory Usage (%)",
+          "min": 0,
+          "max": 100
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2,
+      "alert": {
+        "conditions": [
+          {
+            "evaluator": {
+              "params": [
+                85
+              ],
+              "type": "gt"
+            },
+            "operator": {
+              "type": "and"
+            },
+            "query": {
+              "params": [
+                "A",
+                "5m",
+                "now"
+              ]
+            },
+            "reducer": {
+              "params": [],
+              "type": "last"
+            },
+            "type": "query"
+          }
+        ],
+        "executionErrorState": "alerting",
+        "for": "5m",
+        "frequency": "10s",
+        "handler": 1,
+        "name": "GPU Memory High",
+        "noDataState": "no_data",
+        "notifications": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Inference Latency Alert Status",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(model_inference_duration_seconds_bucket[5m]))",
+          "refId": "A",
+          "legendFormat": "95th Percentile Latency"
+        },
+        {
+          "expr": "2.0",
+          "refId": "B",
+          "legendFormat": "Warning Threshold"
+        },
+        {
+          "expr": "5.0",
+          "refId": "C",
+          "legendFormat": "Critical Threshold"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "yAxes": [
+        {
+          "label": "Latency (seconds)",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2
+    },
+    {
+      "id": 7,
+      "title": "Active Alerts Table",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "alertstate": true
+            },
+            "renameByName": {
+              "alertname": "Alert Name",
+              "component": "Component",
+              "severity": "Severity",
+              "instance": "Instance"
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": "warning"
+                    },
+                    {
+                      "color": "red",
+                      "value": "critical"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "title": "Alert Rate",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(prometheus_notifications_total[5m])",
+          "refId": "A",
+          "legendFormat": "Notification Rate"
+        },
+        {
+          "expr": "rate(alertmanager_alerts_received_total[5m])",
+          "refId": "B",
+          "legendFormat": "Alerts Received Rate"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "yAxes": [
+        {
+          "label": "Rate (per second)",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ],
+      "lines": true,
+      "fill": 1,
+      "linewidth": 2
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "schemaVersion": 27,
+  "version": 0,
+  "folderId": 0
 }
