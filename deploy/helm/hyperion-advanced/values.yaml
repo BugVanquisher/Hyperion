@@ -127,8 +127,19 @@ ingress:
 # Redis configuration
 redis:
   enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
   auth:
     enabled: false
+  resources:
+    limits:
+      cpu: 1
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
   master:
     persistence:
       enabled: true

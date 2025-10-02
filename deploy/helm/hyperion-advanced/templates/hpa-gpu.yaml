@@ -1,0 +1,43 @@
+{{- if and .Values.autoscaling.gpuHpa.enabled .Values.app.gpu.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "hyperion.fullname" . }}-gpu-hpa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hyperion.labels" . | nindent 4 }}
+    workload-type: gpu
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "hyperion.fullname" . }}-gpu
+  minReplicas: {{ .Values.autoscaling.gpuHpa.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.gpuHpa.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.gpuHpa.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.gpuHpa.targetMemoryUtilizationPercentage }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+{{- end }}
