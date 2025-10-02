@@ -259,48 +259,39 @@ class RequestBatcher:
             await self._process_batch_generation(requests)
 
     async def _process_batch_generation(self, requests: List[BatchRequest]):
-        """Process multiple requests using batch generation."""
-        # For now, process them sequentially but with shared model state
-        # In a full implementation, this would use actual batch inference
-
-        from .models.llm import generate_text
+        """Process multiple requests using true batch inference."""
+        from .models.llm import generate_text_batch
 
         start_time = time.time()
 
-        tasks = []
-        for request in requests:
-            task = asyncio.create_task(
-                self._generate_single_in_batch(request, start_time)
-            )
-            tasks.append(task)
-
-        # Wait for all to complete
-        await asyncio.gather(*tasks, return_exceptions=True)
-
-    async def _generate_single_in_batch(
-        self, request: BatchRequest, batch_start_time: float
-    ):
-        """Generate response for a single request within a batch."""
         try:
-            from .models.llm import generate_text
+            # Extract all prompts and parameters
+            prompts = [req.prompt for req in requests]
+            max_tokens_list = [req.max_tokens for req in requests]
+            temperatures = [req.temperature for req in requests]
 
-            response, tokens, model_name = await generate_text(
-                request.prompt, request.max_tokens, request.temperature
+            # Perform true batch inference
+            batch_results = await generate_text_batch(
+                prompts, max_tokens_list, temperatures
             )
 
-            # Use batch start time for consistent timing
-            processing_time = int((time.time() - batch_start_time) * 1000)
+            # Distribute results back to requests
+            processing_time = int((time.time() - start_time) * 1000)
 
-            result = BatchResult(
-                response=response,
-                tokens_used=tokens,
-                model_name=model_name,
-                processing_time_ms=processing_time,
-            )
-            request.future.set_result(result)
+            for request, (response, tokens, model_name) in zip(requests, batch_results):
+                result = BatchResult(
+                    response=response,
+                    tokens_used=tokens,
+                    model_name=model_name,
+                    processing_time_ms=processing_time,
+                )
+                request.future.set_result(result)
 
         except Exception as e:
-            request.future.set_exception(e)
+            # If batch processing fails, set exception for all requests
+            for request in requests:
+                if not request.future.done():
+                    request.future.set_exception(e)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get batching statistics."""

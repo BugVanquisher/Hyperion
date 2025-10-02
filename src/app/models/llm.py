@@ -144,40 +144,94 @@ async def init_model():
 
 
 async def generate_text(prompt: str, max_tokens: int, temperature: float):
+    """Generate text for a single prompt. For batch processing, use generate_text_batch."""
+    results = await generate_text_batch([prompt], [max_tokens], [temperature])
+    response, tokens, model_name = results[0]
+    return response, tokens, model_name
+
+
+async def generate_text_batch(
+    prompts: list[str], max_tokens_list: list[int], temperatures: list[float]
+):
+    """
+    Generate text for multiple prompts using true batch inference.
+
+    Args:
+        prompts: List of input prompts
+        max_tokens_list: List of max_tokens for each prompt
+        temperatures: List of temperatures for each prompt
+
+    Returns:
+        List of tuples (response, tokens_used, model_name) for each prompt
+    """
     await init_model()
 
-    # Tokenize input
-    inputs = tokenizer.encode(prompt, return_tensors="pt")
-    inputs = inputs.to(device)
+    # For true batching, we need to handle different generation parameters
+    # Group requests by identical parameters for efficient batching
+    param_groups = {}
+    for i, (prompt, max_tok, temp) in enumerate(
+        zip(prompts, max_tokens_list, temperatures)
+    ):
+        key = (max_tok, temp)
+        if key not in param_groups:
+            param_groups[key] = []
+        param_groups[key].append((i, prompt))
 
-    # Generate with optimized settings
-    with torch.no_grad():
-        if device.type == "cuda":
-            # GPU optimized generation
-            with torch.cuda.amp.autocast():
+    # Process each parameter group as a batch
+    results = [None] * len(prompts)
+
+    for (max_tok, temp), indexed_prompts in param_groups.items():
+        indices = [idx for idx, _ in indexed_prompts]
+        batch_prompts = [prompt for _, prompt in indexed_prompts]
+
+        # Tokenize all prompts in the batch
+        encoded = tokenizer(
+            batch_prompts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512,
+        )
+        input_ids = encoded["input_ids"].to(device)
+        attention_mask = encoded["attention_mask"].to(device)
+
+        # True batch generation
+        with torch.no_grad():
+            if device.type == "cuda":
+                # GPU optimized batch generation
+                with torch.cuda.amp.autocast():
+                    outputs = model.generate(
+                        input_ids,
+                        attention_mask=attention_mask,
+                        max_length=input_ids.shape[1] + max_tok,
+                        temperature=temp,
+                        do_sample=True,
+                        pad_token_id=tokenizer.eos_token_id,
+                        use_cache=True,
+                        early_stopping=True,
+                    )
+            else:
+                # CPU batch generation
                 outputs = model.generate(
-                    inputs,
-                    max_length=inputs.shape[1] + max_tokens,
-                    temperature=temperature,
+                    input_ids,
+                    attention_mask=attention_mask,
+                    max_length=input_ids.shape[1] + max_tok,
+                    temperature=temp,
                     do_sample=True,
                     pad_token_id=tokenizer.eos_token_id,
                     use_cache=True,
-                    early_stopping=True,
                 )
-        else:
-            # CPU generation
-            outputs = model.generate(
-                inputs,
-                max_length=inputs.shape[1] + max_tokens,
-                temperature=temperature,
-                do_sample=True,
-                pad_token_id=tokenizer.eos_token_id,
-                use_cache=True,
-            )
 
-    # Decode response
-    response = tokenizer.decode(outputs[0][inputs.shape[1] :], skip_special_tokens=True)
-    return response.strip(), len(outputs[0]) - inputs.shape[1], MODEL_NAME
+        # Decode each response in the batch
+        for i, (idx, output) in enumerate(zip(indices, outputs)):
+            input_length = input_ids[i].shape[0]
+            response = tokenizer.decode(
+                output[input_length:], skip_special_tokens=True
+            )
+            tokens_generated = len(output) - input_length
+            results[idx] = (response.strip(), tokens_generated, MODEL_NAME)
+
+    return results
 
 
 async def health_check():
